@@ -1,0 +1,20 @@
+{
+  "name": "Kutukan Si Oyen",
+  "short_name": "Si Oyen",
+  "description": "Raka dikutuk menjadi kucing oren. Jelajahi desa di kaki gunung, selesaikan misi, dan rawat kucing-kucing liar untuk mematahkan kutukan.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#120d1c",
+  "theme_color": "#120d1c",
+  "lang": "id",
+  "categories": ["games"],
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable"},
+    {"src": "maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
