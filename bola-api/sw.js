@@ -1,5 +1,5 @@
 // Bola Api Arena - service worker: game tetap bisa dibuka offline (mode lokal) setelah pertama kali dimuat.
-const CACHE = 'bola-api-v1';
+const CACHE = 'bola-api-v2';
 const CORE = ['./', 'index.html', 'style.css', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'maskable-192.png', 'maskable-512.png',
   'js/util.js', 'js/data.js', 'js/sim.js', 'js/ai.js', 'js/render.js', 'js/chars.js', 'js/arena.js', 'js/fx.js', 'js/cine.js', 'js/audio.js',
   'js/narrator.js', 'js/input.js', 'js/net.js', 'js/ui.js', 'js/layout.js', 'js/game.js', 'js/main.js',
@@ -18,14 +18,15 @@ self.addEventListener('fetch', e => {
   const url = new URL(req.url);
   if (/supabase\.co$/.test(url.hostname)) return; // realtime online: jangan di-cache
   if (req.mode === 'navigate') {
-    e.respondWith(fetch(req).then(r => { const copy = r.clone(); caches.open(CACHE).then(c => c.put('index.html', copy)); return r; })
+    e.respondWith(fetch(req, { cache: 'no-cache' }).then(r => { const copy = r.clone(); caches.open(CACHE).then(c => c.put('index.html', copy)); return r; })
       .catch(() => caches.match('index.html')));
     return;
   }
   const own = url.origin === location.origin;
   // berkas game sendiri: jaringan dulu (dapat pembaruan), cadangan cache; pustaka CDN: cache dulu
   if (own) {
-    e.respondWith(fetch(req).then(r => { if (r && r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); } return r; })
+    // cache:'no-cache' = selalu tanya server dulu (304 bila sama), jadi pembaruan langsung terpakai, tidak tertahan cache HTTP 10 menit
+    e.respondWith(fetch(req, { cache: 'no-cache' }).then(r => { if (r && r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); } return r; })
       .catch(() => caches.match(req)));
     return;
   }
