@@ -143,7 +143,17 @@
   };
 
   Net.join = function (code, role, presence) {
-    if (Net.transport === 'sb') { Net.leave(); return Net.sbJoin(code, role, presence); }
+    if (Net.transport === 'sb') {
+      Net.leave();
+      return Net.sbJoin(code, role, presence).catch(function (e) {
+        /* socket kadang macet "connecting" (mis. setelah muat ulang paksa): buang klien, buat baru, coba sekali lagi */
+        if (!e || !/timeout|timed_out|channel_error/.test(String(e.code))) throw e;
+        Net.sbLeave();
+        try { if (Net.sbClient) Net.sbClient.realtime.disconnect(); } catch (x) { /* abaikan */ }
+        Net.sbClient = null;
+        return Net.sbJoin(code, role, presence);
+      });
+    }
     if (!Net.room) return Promise.reject({ code: 'unavailable' });
     Net.leave();
     Net.role = role; Net.code = code; Net.other = null; Net.otherPeer = null; Net.lastOtherAt = 0; Net.mine = {};
