@@ -75,7 +75,15 @@
         ch.subscribe(function (status, err) {
           if (Net.sb !== sb) return;
           if (status === 'SUBSCRIBED') {
-            ch.track({ r: Net.mine.r, v: 1 }).then(function () { if (!settled) { settled = true; Net.connected = true; fire('conn', true); resolve(ch); } Net.sbPush(); }, function (e) { if (!settled) { settled = true; reject({ code: 'track', message: String(e) }); } });
+            ch.track({ r: Net.mine.r, v: 1 }).then(function () {
+              if (!settled) { settled = true; Net.connected = true; fire('conn', true); resolve(ch); }
+              Net.sbPush();
+              /* kirim ulang berkala selama lawan sudah hadir tapi kabarnya belum/lama tidak diterima — siaran pertama bisa hilang saat lawan baru bergabung */
+              if (!sb.alive) sb.alive = setInterval(function () {
+                if (Net.sb !== sb) { clearInterval(sb.alive); return; }
+                if (sb.peer && Date.now() - Net.lastOtherAt > 1500) Net.sbPush();
+              }, 1200);
+            }, function (e) { if (!settled) { settled = true; reject({ code: 'track', message: String(e) }); } });
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             if (!settled) { settled = true; reject({ code: status.toLowerCase(), message: err ? String(err) : '' }); } else fire('error', { code: status.toLowerCase() });
           } else if (status === 'CLOSED' && settled) { fire('error', { code: 'closed' }); }
@@ -99,6 +107,7 @@
   Net.sbLeave = function () {
     var sb = Net.sb; if (!sb) return;
     Net.sb = null;
+    if (sb.alive) clearInterval(sb.alive);
     try { sb.ch.untrack(); } catch (e) { /* abaikan */ }
     try { sb.ch.unsubscribe(); if (Net.sbClient) Net.sbClient.removeChannel(sb.ch); } catch (e2) { /* abaikan */ }
   };
