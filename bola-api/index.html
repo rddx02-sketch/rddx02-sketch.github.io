@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#170e1b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#170e1b;color:#f7f0e3}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Bola Api Arena</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bola Api">
+<meta name="theme-color" content="#170e1b">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Barlow+Semi+Condensed:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+
+<canvas id="game" aria-label="Lapangan 3D Bola Api Arena"></canvas>
+
+<div id="ui">
+  <div id="loading"><div class="t">BOLA API ARENA<small id="loadMsg">Menyalakan bola api…</small></div></div>
+  <div id="flash" hidden aria-hidden="true"></div>
+  <button id="btnFs" class="fsBtn" aria-label="Layar penuh" title="Layar penuh (F11)" hidden>⛶</button>
+  <div id="layoutEdit" hidden>
+    <div class="leBar">
+      <div class="leTitle"><b>Atur posisi tombol layar</b><span id="leOrient"></span><span>Seret tombol atau area joystick. Ketuk untuk memilih, lalu ubah ukurannya.</span></div>
+      <label class="leSize"><span id="leSel">Ukuran</span><input type="range" id="leSize" min="0.6" max="1.5" step="0.05" value="1" aria-label="Ukuran tombol terpilih"></label>
+      <div class="leBtns"><button class="btn" id="leReset" type="button">Atur ulang</button><button class="btn" id="leCancel" type="button">Batal</button><button class="btn main" id="leLock" type="button">🔒 Kunci &amp; simpan</button></div>
+    </div>
+  </div>
+
+  <!-- ===== Menu utama ===== -->
+  <section id="scrMenu" class="scr" hidden>
+    <div class="wrap">
+      <div class="brand">
+        <div class="eyebrow">Turnamen Tarkam · Sepak Bola Api</div>
+        <h1 class="title">BOLA API<span>ARENA</span></h1>
+        <p class="tagline">Warga kampung, bola menyala, dan kiper berilmu silat. Tendang sekeras-kerasnya.</p>
+        <div class="records" id="records"></div>
+      </div>
+      <nav class="menuList" aria-label="Menu utama">
+        <button class="sign hot" data-go="quick">Tanding Cepat <small>Lawan NPC</small></button>
+        <button class="sign" data-go="tour">Turnamen Tarkam <small>4 kampung, 1 piala</small></button>
+        <button class="sign cool" data-go="online">Main Online <small>Scan QR HP lawan</small></button>
+        <div class="menuRow">
+          <button class="sign" data-go="pen">Adu Penalti Api</button>
+          <button class="sign" data-go="practice">Latihan Tendangan</button>
+        </div>
+        <div class="menuRow">
+          <button class="sign" data-go="team">Tim Saya</button>
+          <button class="sign" data-go="guide">Panduan</button>
+        </div>
+        <button class="sign" data-go="settings">Pengaturan <small>Kontrol, narator, grafis</small></button>
+      </nav>
+    </div>
+  </section>
+
+  <!-- ===== Tim saya ===== -->
+  <section id="scrTeam" class="scr" hidden>
+    <div class="topbar"><button class="back" data-back aria-label="Kembali">←</button><h2>Tim Saya</h2></div>
+    <div class="body">
+      <div class="preview" id="teamPreview">
+        <div class="previewTag"><b id="pvName"></b><span id="pvSub"></span></div>
+      </div>
+      <div class="side">
+        <div class="tabs" role="tablist">
+          <button class="tab on" data-tab="tim" role="tab">Tim</button>
+          <button class="tab" data-tab="pemain" role="tab">Pemain</button>
+        </div>
+        <div class="scroll" id="teamTabTim">
+          <div class="sect">
+            <div class="row2">
+              <div class="field"><label for="inTeamName">Nama tim</label><input id="inTeamName" type="text" maxlength="20" autocomplete="off"></div>
+              <div class="field"><label for="inTeamShort">Singkatan</label><input id="inTeamShort" type="text" maxlength="3" autocomplete="off"></div>
+            </div>
+          </div>
+          <div class="sect"><h3>Jenis anggota tim</h3><div class="chips" id="chKind"></div><p class="hint" id="kindHint"></p></div>
+          <div class="sect" id="sectPpe" hidden><h3>APD pekerja migas</h3><div class="chips" id="chPpe"></div><p class="hint">Helm proyek, kacamata safety, atau tanpa helm. Semua tetap bercoverall reflektif dan sepatu safety.</p></div>
+          <div class="sect"><h3>Warna utama</h3><div class="swatches" id="swC1"></div></div>
+          <div class="sect"><h3>Warna kedua</h3><div class="swatches" id="swC2"></div></div>
+          <div class="sect"><h3>Warna kiper</h3><div class="swatches" id="swGK"></div></div>
+          <div class="sect"><h3>Seragam</h3><div class="chips" id="chOutfit"></div><p class="hint">Jersey bola memakai motif dan kaus kaki. Kaos seragam polos bersablon api, singlet memperlihatkan lengan.</p></div>
+          <div class="sect"><h3>Motif jersey</h3><div class="chips" id="chPattern"></div></div>
+          <div class="sect"><h3>Bawahan</h3><div class="chips" id="chBottom"></div></div>
+          <div class="sect"><h3>Taktik</h3><div class="chips" id="chTactic"></div><p class="hint" id="tacticHint"></p></div>
+        </div>
+        <div class="scroll hidden" id="teamTabPemain">
+          <div class="sect"><div class="roster" id="roster"></div></div>
+          <div id="pEdit"></div>
+        </div>
+        <div class="actions" style="padding:10px 14px;">
+          <button class="btn" id="btnRandomLook">Acak penampilan</button>
+          <button class="btn main" data-back>Simpan</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Atur pertandingan ===== -->
+  <section id="scrSetup" class="scr dim" hidden>
+    <div class="topbar"><button class="back" data-back aria-label="Kembali">←</button><h2 id="setupTitle">Tanding Cepat</h2></div>
+    <div class="scroll" id="setupBody"></div>
+    <div class="actions" style="max-width:900px;width:100%;margin:0 auto;"><button class="btn main" id="btnStart">Mulai Tanding</button></div>
+  </section>
+
+  <!-- ===== Online ===== -->
+  <section id="scrOnline" class="scr dim" hidden>
+    <div class="topbar"><button class="back" data-back aria-label="Kembali">←</button><h2>Main Online</h2></div>
+    <div class="scroll" id="onlineBody">
+      <div class="sect" id="onChecking"><div class="status wait"><i></i><span>Memeriksa sambungan online…</span></div></div>
+      <div class="sect hidden" id="onNo">
+        <h3>Mode online belum bisa di tampilan ini</h3>
+        <p class="hint warn" id="onNoWhy"></p>
+        <ol class="steps">
+          <li>Buka tautan game ini di <b>browser biasa</b> (Chrome / Safari), bukan di jendela dalam WhatsApp. Ketuk menu ⋮ atau ikon "buka di browser".</li>
+          <li>Pastikan halaman claude.ai yang memuat game sudah terbuka penuh dan kamu <b>masuk akun</b> bila diminta.</li>
+          <li>Kedua HP harus online. Boleh di WiFi yang sama atau jaringan berbeda.</li>
+          <li>Tuan rumah memilih <b>Buat Room</b>, lawan memindai QR, membuka tautan yang dibagikan, atau mengetik kode.</li>
+        </ol>
+        <div class="actions"><button class="btn" id="btnOnRetry" type="button">Coba periksa lagi</button><button class="btn main" id="btnGoLan" type="button">📶 Pakai WiFi lokal saja</button></div>
+        <p class="hint">Atau main lewat WiFi/hotspot yang sama tanpa internet (lihat bagian WiFi lokal di bawah).</p>
+      </div>
+      <!-- WiFi lokal / hotspot: tanpa internet, tanpa server -->
+      <div class="sect" id="onLan" hidden>
+        <h3>📶 Main lewat WiFi / hotspot yang sama (tanpa internet)</h3>
+        <p class="hint">Kedua HP tersambung ke WiFi yang sama, atau satu HP menyalakan hotspot dan HP lain bergabung. Tukar <b>kode sambungan</b> lewat QR, tombol Bagikan (WhatsApp/Bluetooth share), atau salin-tempel. Bluetooth hanya untuk mengirim kodenya; permainan berjalan lewat WiFi.</p>
+        <div class="chips"><button class="chip on" data-lan="host">Tuan rumah</button><button class="chip" data-lan="guest">Tamu</button></div>
+        <div id="lanHost">
+          <div class="actions" style="justify-content:flex-start;"><button class="btn main" id="btnLanOffer" type="button">1. Buat kode undangan</button></div>
+          <div id="lanOfferBox" hidden>
+            <div class="qrBox"><div id="lanQr"></div>
+              <div style="display:grid;gap:8px;min-width:0;">
+                <div class="eyebrow">Kode undangan (kirim ke tamu)</div>
+                <textarea id="lanOfferTxt" rows="3" readonly class="codeTxt"></textarea>
+                <div class="actions" style="justify-content:flex-start;"><button class="btn" id="btnLanOfferCopy" type="button">Salin</button><button class="btn" id="btnLanOfferShare" type="button">📤 Bagikan</button></div>
+              </div>
+            </div>
+            <div class="field"><label for="lanAnswerTxt">2. Tempel kode balasan dari tamu</label><textarea id="lanAnswerTxt" rows="3" class="codeTxt" placeholder="BAL1:a:..."></textarea></div>
+            <div class="actions" style="justify-content:flex-start;"><button class="btn main" id="btnLanAccept" type="button">Sambungkan</button><button class="btn" id="btnLanScanA" type="button">📷 Pindai QR balasan</button><label class="btn" for="inLanScanA">Foto QR</label></div>
+            <input id="inLanScanA" type="file" accept="image/*" capture="environment" class="hidden">
+          </div>
+          <div class="status" id="lanHostStatus"><i></i><span>Belum ada sambungan.</span></div>
+        </div>
+        <div id="lanGuest" hidden>
+          <div class="field"><label for="lanOfferIn">1. Tempel kode undangan dari tuan rumah</label><textarea id="lanOfferIn" rows="3" class="codeTxt" placeholder="BAL1:o:..."></textarea></div>
+          <div class="actions" style="justify-content:flex-start;"><button class="btn main" id="btnLanAnswer" type="button">Buat kode balasan</button><button class="btn" id="btnLanScanO" type="button">📷 Pindai QR undangan</button><label class="btn" for="inLanScanO">Foto QR</label></div>
+          <input id="inLanScanO" type="file" accept="image/*" capture="environment" class="hidden">
+          <div id="lanAnswerBox" hidden>
+            <div class="qrBox"><div id="lanQr2"></div>
+              <div style="display:grid;gap:8px;min-width:0;">
+                <div class="eyebrow">2. Kode balasan (kirim balik ke tuan rumah)</div>
+                <textarea id="lanAnswerOut" rows="3" readonly class="codeTxt"></textarea>
+                <div class="actions" style="justify-content:flex-start;"><button class="btn" id="btnLanAnswerCopy" type="button">Salin</button><button class="btn" id="btnLanAnswerShare" type="button">📤 Bagikan</button></div>
+              </div>
+            </div>
+          </div>
+          <div class="status" id="lanGuestStatus"><i></i><span>Belum ada sambungan.</span></div>
+        </div>
+        <div id="lanCam" class="camScan" hidden>
+          <video id="lanVideo" playsinline muted autoplay></video>
+          <div class="camFrame"></div>
+          <div class="camStatus" id="lanCamStatus">Membuka kamera…</div>
+          <button class="btn" id="btnLanCamStop" type="button">Tutup kamera</button>
+        </div>
+      </div>
+      <div class="hidden" id="onYes">
+        <div class="sect" id="onChoose">
+          <div class="chips"><button class="chip on" data-onl="host">Buat Room</button><button class="chip" data-onl="guest">Gabung Room</button><button class="chip" data-onl="lan">📶 WiFi lokal</button></div>
+          <p class="hint">Kedua pemain membuka tautan game ini di browser HP/PC masing-masing (semua jenis perangkat bisa). Tuan rumah memegang aturan pertandingan.</p>
+        </div>
+        <div id="onHost">
+          <div class="sect" id="hostQrSect">
+            <div class="qrBox">
+              <div id="qr"></div>
+              <div style="display:grid;gap:8px;min-width:0;">
+                <div class="eyebrow">Kode room</div>
+                <div class="bigCode" id="roomCode">----</div>
+                <div class="status wait" id="hostStatus"><i></i><span>Menunggu lawan memindai…</span></div>
+                <p class="hint">Lawan: pindai QR ini dengan kamera, buka tautan yang dibagikan, atau ketik kodenya di <b>Main Online → Gabung Room</b>.</p>
+                <div class="actions" style="justify-content:flex-start;"><button class="btn" id="btnShareLink" type="button">📤 Bagikan tautan (WhatsApp dll.)</button></div>
+                <div class="hint linkBox" id="roomLink" hidden></div>
+              </div>
+            </div>
+          </div>
+          <div class="sect hidden" id="hostVs"></div>
+          <div class="sect">
+            <h3>Aturan pertandingan</h3>
+            <div id="hostCfgSummary" class="hint"></div>
+            <div class="actions"><button class="btn" id="btnHostCfg">Ubah aturan</button><button class="btn main" id="btnHostStart" disabled>Mulai</button></div>
+          </div>
+        </div>
+        <div id="onGuest" class="hidden">
+          <div class="sect" id="guestScanSect">
+            <h3>Pindai QR tuan rumah</h3>
+            <div class="actions" style="justify-content:flex-start;">
+              <button class="btn aura" id="btnCamScan" type="button">📷 Pindai langsung dengan kamera</button>
+              <label class="btn" for="inScan" style="display:inline-grid;place-items:center;">Foto QR</label>
+            </div>
+            <input id="inScan" type="file" accept="image/*" capture="environment" class="hidden">
+            <div id="camScan" class="camScan" hidden>
+              <video id="camVideo" playsinline muted autoplay></video>
+              <div class="camFrame"></div>
+              <div class="camStatus" id="camStatus">Membuka kamera…</div>
+              <button class="btn" id="btnCamStop" type="button">Tutup kamera</button>
+            </div>
+            <p class="hint">Dapat tautan dari WhatsApp? Buka saja tautannya, room langsung tersambung. Kode room juga bisa ditempel ke kotak di bawah.</p>
+            <div class="field"><label for="inCode">Atau ketik kode room</label>
+              <div class="codeRow"><input id="inCode" type="text" maxlength="6" autocomplete="off" placeholder="KODE"><button class="btn main" id="btnJoin">Gabung</button></div>
+            </div>
+            <div class="status" id="guestStatus"><i></i><span>Belum tersambung.</span></div>
+          </div>
+          <div class="sect hidden" id="guestVs"></div>
+          <div class="sect hidden" id="guestReady">
+            <div id="guestCfgSummary" class="hint"></div>
+            <div class="actions"><button class="btn main" id="btnGuestReady">Saya siap</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Panduan ===== -->
+  <section id="scrGuide" class="scr dim" hidden>
+    <div class="topbar"><button class="back" data-back aria-label="Kembali">←</button><h2>Panduan</h2></div>
+    <div class="scroll guide" id="guideBody"></div>
+  </section>
+
+  <!-- ===== Pengaturan ===== -->
+  <section id="scrSettings" class="scr dim" hidden>
+    <div class="topbar"><button class="back" data-back aria-label="Kembali">←</button><h2>Pengaturan</h2></div>
+    <div class="scroll" id="settingsBody"></div>
+  </section>
+
+  <!-- ===== Hasil ===== -->
+  <section id="scrResult" class="scr dim" hidden>
+    <div class="topbar"><h2>Hasil Pertandingan</h2></div>
+    <div class="scroll" id="resultBody"></div>
+    <div class="actions" style="max-width:900px;width:100%;margin:0 auto;" id="resultActions"></div>
+  </section>
+
+  <!-- ===== Bagan turnamen ===== -->
+  <section id="scrBracket" class="scr dim" hidden>
+    <div class="topbar"><button class="back" data-back aria-label="Kembali">←</button><h2>Turnamen Tarkam</h2></div>
+    <div class="scroll" id="bracketBody"></div>
+    <div class="actions" style="max-width:900px;width:100%;margin:0 auto;" id="bracketActions"></div>
+  </section>
+
+  <!-- ===== Permainan ===== -->
+  <div id="play" hidden>
+    <div id="hud">
+      <div class="board" id="board">
+        <div class="tm"><i id="hudCA"></i><span id="hudNA">TKP</span></div>
+        <div class="sc" id="hudSA">0</div>
+        <div class="ck" id="hudClock">4:00</div>
+        <div class="sc" id="hudSB">0</div>
+        <div class="tm"><span id="hudNB">GPR</span><i id="hudCB"></i></div>
+      </div>
+      <div class="sems" id="sems">
+        <div class="sem" id="semA"><label>SEMANGAT</label><div class="bar"><i id="semBarA" style="width:20%"></i></div></div>
+        <div class="sem" id="semB"><label>SEMANGAT</label><div class="bar"><i id="semBarB" style="width:20%"></i></div></div>
+      </div>
+      <div class="tally hidden" id="tally"></div>
+      <button class="hudBtn" id="btnPause" aria-label="Jeda">❚❚</button>
+      <div id="hudInfo"></div>
+      <div class="me" id="me"><b id="meName"></b><span id="meShot"></span><div class="bar"><i id="meStam" style="width:100%"></i></div></div>
+      <div class="comment" id="comment" style="opacity:0"></div>
+      <div class="keyLegend" id="keyLegend"></div>
+      <canvas id="minimap" width="200" height="130" hidden aria-label="Peta mini lapangan"></canvas>
+      <div id="bannerHost"></div>
+      <div id="toastHost"></div>
+    </div>
+    <div id="controls">
+      <div id="joyZone"></div>
+      <div id="joyBase"><div id="joyKnob"></div></div>
+      <div class="joyHint" id="joyHint">Geser di sini untuk lari</div>
+      <div class="pad">
+        <button class="pbtn" id="bShoot">TENDANG</button>
+        <button class="pbtn" id="bPass">OPER</button>
+        <button class="pbtn" id="bGocek">GOCEK</button>
+        <button class="pbtn" id="bSwitch">GANTI</button>
+        <button class="pbtn" id="bSprint">SPRINT</button>
+      </div>
+    </div>
+    <div id="aim" hidden>
+      <div>
+        <div class="goalGrid"><div class="g" id="aimGrid"></div></div>
+        <div class="aimInfo" id="aimInfo"></div>
+      </div>
+      <div class="meter" id="meter"><div class="over" style="height:16.7%"></div><div class="win" style="bottom:70.8%;height:12.5%"></div><div class="fill" id="meterFill" style="height:0%"></div></div>
+    </div>
+    <div id="cine" hidden>
+      <div class="lb t"></div><div class="lb b"></div>
+      <div id="cineAtt"></div>
+      <div id="cineDef"></div>
+      <div id="cineClash"></div>
+      <div id="cineRes"></div>
+      <div class="skipHint" id="skipHint">Ketuk layar untuk lewati</div>
+      <div class="flash" id="flash"></div>
+    </div>
+  </div>
+
+  <!-- ===== Jeda ===== -->
+  <section id="scrPause" class="scr" hidden style="background:rgba(10,5,12,0.72);justify-content:center;align-items:center;">
+    <div class="panel" style="width:min(380px,100%);display:grid;gap:10px;">
+      <h2 style="font-family:var(--f-display);font-weight:400;color:var(--flame);">Jeda</h2>
+      <p class="hint" id="pauseHint"></p>
+      <button class="btn main" id="btnResume">Lanjut main</button>
+      <button class="btn" id="btnRestart">Ulang pertandingan</button>
+      <button class="btn" id="btnPauseSettings">Pengaturan</button>
+      <button class="btn" id="btnQuit">Keluar ke menu</button>
+    </div>
+  </section>
+
+  <div id="modal" class="modal" hidden><div class="panel"><h3 id="modalTitle"></h3><p class="hint" id="modalText"></p><div class="actions" id="modalActions"></div></div></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="js/util.js"></script>
+<script src="js/data.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/render.js"></script>
+<script src="js/chars.js"></script>
+<script src="js/arena.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/cine.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/narrator.js"></script>
+<script src="js/input.js"></script>
+<script src="js/net.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/game.js"></script>
+<script src="js/main.js"></script>
+
+<script>if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost")){addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})})}</script>
+</body>
+</html>
