@@ -877,8 +877,10 @@
     root.addEventListener('pointerdown', unlock, { passive: true });
     root.addEventListener('keydown', unlock, { passive: true });
     // kode room dari QR yang dipindai kamera HP
-    var hm = String(root.location && root.location.hash || '').match(/^#bola-([a-z0-9]{4,6})$/i);
-    if (hm) App.pendingCode = hm[1].toLowerCase();
+    var loc = root.location || {};
+    var qm = String(loc.search || '').match(/[?&]r(?:oom)?=([a-z0-9]{4,6})(?:&|$)/i);
+    var hm = String(loc.hash || '').match(/^#bola-([a-z0-9]{4,6})$/i);
+    if (qm) App.pendingCode = qm[1].toLowerCase(); else if (hm) App.pendingCode = hm[1].toLowerCase();
     UI.renderRecords(App.records);
     App.buildShowcase();
     UI.show('scrMenu', false);

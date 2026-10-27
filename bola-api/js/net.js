@@ -138,7 +138,8 @@
   Net.roomName = function (code) { return 'bolaapi-' + String(code).toLowerCase(); };
   Net.cleanCode = function (s) {
     s = String(s || '').toLowerCase();
-    var m = s.match(/bola-([a-z0-9]{4,6})/) || s.match(/bolaapi-([a-z0-9]{4,6})/) || s.match(/^\s*([a-z0-9]{4,6})\s*$/);
+    try { if (/%[0-9a-f]{2}/.test(s)) s = decodeURIComponent(s); } catch (e) { /* biarkan apa adanya */ }
+    var m = s.match(/[?&]r(?:oom)?=([a-z0-9]{4,6})(?:[&#\s]|$)/) || s.match(/bola-([a-z0-9]{4,6})/) || s.match(/bolaapi-([a-z0-9]{4,6})/) || s.match(/^\s*([a-z0-9]{4,6})\s*$/);
     return m ? m[1] : null;
   };
 
@@ -305,7 +306,11 @@
   /* ---------- QR ---------- */
   Net.artifactUrl = '';
   Net.qrText = function (code) {
-    return Net.artifactUrl ? (Net.artifactUrl.split('#')[0] + '#bola-' + code) : ('BOLAAPI-' + code.toUpperCase());
+    if (!Net.artifactUrl) return 'BOLAAPI-' + code.toUpperCase();
+    var base = Net.artifactUrl.split('#')[0];
+    // di claude.ai hanya #anchor yang sampai ke halaman; di hosting sendiri pakai ?r= karena Instagram/WhatsApp sering membuang bagian #
+    if (root.claude) return base + '#bola-' + code;
+    return base.split('?')[0] + '?r=' + String(code).toUpperCase();
   };
   Net.drawQR = function (el, text, big) {
     el.innerHTML = '';
