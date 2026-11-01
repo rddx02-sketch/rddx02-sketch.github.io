@@ -11,6 +11,7 @@
     this.scene = new THREE.Scene();
     R3.applyShadows();
     this.arena = BA.Arena.build(this.scene, { arena: st.arena.id, weather: st.weather.id });
+    if (st.weather.snowGround && this.fx) { this.fx.dustCol = '#f4f7fa'; this.fx.dustCol2 = '#c8d2dc'; } /* debu lari jadi serbuk salju */
     this.chars = st.players.map(function (p) {
       var c = BA.Chars.build(p.cfg, st.teams[p.team]);
       c.root.position.set(p.x, 0, p.z);
@@ -61,8 +62,8 @@
     }
     // penanda pemain aktif (pemain manusia)
     for (var k = 0; k < 2; k++) {
-      var on = !cine && st.humans && st.humans[k] && (my === k || (BA.App && BA.App.match && BA.App.match.kind !== 'local'));
-      var ap = st.active ? st.active[k] : null;
+      var on = !cine && st.humans && (st.humans[k] || (k === 1 && st.coop)) && (my === k || st.coop || (BA.App && BA.App.match && BA.App.match.kind !== 'local'));
+      var ap = st.active ? (k === 1 && st.coop ? st.active2 : st.active[k]) : null; /* co-op: penanda ke-2 = pemain rekan */
       if (st.phase === 'pen' || st.phase === 'goal' || st.phase === 'end') on = false;
       this.fx.setMarker(k, ap, on && !!ap);
     }
@@ -155,7 +156,7 @@
     var cc = P(0, 0); g.beginPath(); g.arc(cc[0], cc[1], F.circle * Math.min(sx, sy), 0, Math.PI * 2); g.stroke();
     rect(-F.L / 2, -F.boxW / 2, -F.L / 2 + F.boxL, F.boxW / 2);
     rect(F.L / 2 - F.boxL, -F.boxW / 2, F.L / 2, F.boxW / 2);
-    var act = st.active ? st.active[my] : null;
+    var mm = BA.App && BA.App.match, act = st.active ? (mm && mm.ctl === 2 ? st.active2 : st.active[my]) : null;
     for (var i = 0; i < st.players.length; i++) {
       var p = st.players[i];
       if (!p || p.hidden) continue;
@@ -233,7 +234,7 @@
         case 'kickoffFirst': A.crowdLevel(0.06); A.cheer(1.2); break;
         case 'whistle': A.whistle(!!e.short); break;
         case 'kick': A.kick(e.soft ? 0.6 : 1); if (!e.soft) say(kv(e.p), 'kick'); break;
-        case 'pass': A.pass(); break;
+        case 'pass': A.pass(e.pow, e.lob); break;
         case 'bounce': A.bounce(e.v); break;
         case 'wall': A.bounce(0.6); break;
         case 'tackle':
@@ -255,9 +256,9 @@
           if (e.pen && e.practice) { UI.toast('GOL! Latihan berhasil'); break; }
           if (e.pen) { UI.toast((st.teams[e.team] ? st.teams[e.team].short : '') + ' mencetak penalti!'); break; }
           if (e.free) {
-            var gx = (e.team === 0 ? 1 : -1) * F.L / 2;
+            var gx = (st.dirOf ? st.dirOf(e.team) : (e.team === 0 ? 1 : -1)) * F.L / 2;
             v.fx.burst(gx, 1, st.ball.z, 'confetti', { n: 100 });
-            v.arena.bulge(e.team === 0 ? 1 : -1, st.ball.z, 0.8);
+            v.arena.bulge(st.dirOf ? st.dirOf(e.team) : (e.team === 0 ? 1 : -1), st.ball.z, 0.8);
             A.goalBlast();
             v.rig.kick(0.6);
           }
@@ -274,6 +275,8 @@
         case 'penalty': UI.banner('PENALTI!', st.teams[e.team] ? 'untuk ' + st.teams[e.team].name : '', 1800); A.whistle(false); break;
         case 'shootout': UI.banner('ADU PENALTI', 'Api siapa paling panas?', 2000); A.whistle(false); break;
         case 'golden': UI.banner('GOL EMAS!', 'Gol berikutnya menang', 2200); A.whistle(false); break;
+        case 'half': UI.banner('TURUN MINUM', 'Babak 2: tim bertukar sisi lapangan', 2600); break;
+        case 'backpass': UI.banner('BACK-PASS', 'Kiper harus main pakai kaki', 1200); break;
         case 'restart': if (e.kind === 'freekick') UI.toast('Tendangan bebas ' + (st.teams[e.team] ? st.teams[e.team].short : '')); break;
         case 'offside': { var op = st.players[e.p]; A.whistle(true); UI.banner('OFFSIDE', op ? op.name + ' terjebak offside' : '', 1500); break; }
         case 'foul': { var fp = st.players[e.p], fv = st.players[e.on]; A.whistle(true); A.tackle(); UI.banner(e.box ? 'PENALTI!' : 'PELANGGARAN', (fp ? fp.name : '') + (fv ? ' melanggar ' + fv.name : ''), 1500); if (fv) v.fx.burst(fv.x, 0.2, fv.z, 'dust', { n: 10 }); break; }

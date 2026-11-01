@@ -28,8 +28,8 @@
 
   S.assignDefense = function (team, car) {
     var self = this;
-    var human = this.humans[team] ? this.active[team] : null;
-    var defs = this.players.filter(function (p) { return p.team === team && p.role !== 'GK' && !p.hidden && p !== human; });
+    var human = this.humans[team] ? this.active[team] : null, human2 = this.coop && team === 0 ? this.active2 : null;
+    var defs = this.players.filter(function (p) { return p.team === team && p.role !== 'GK' && !p.hidden && p !== human && p !== human2; });
     defs.forEach(function (p) { p.markTarget = null; });
     defs.sort(function (a, b) { return U.dist(a.x, a.z, car.x, car.z) - U.dist(b.x, b.z, car.x, car.z); });
     var humanPress = human && U.dist(human.x, human.z, car.x, car.z) < 3.2;
@@ -61,7 +61,7 @@
     }
     this.players.forEach(function (p) {
       if (p.hidden) return;
-      if (self.humans[p.team] && self.active[p.team] === p) return;
+      if (self.isCtl(p)) return;
       if (p.stunT > 0 || p.slideT > 0) { p.dvx = 0; p.dvz = 0; return; }
       if (p.role === 'GK') { self.aiKeeper(p, dt); return; }
       if (b.owner === p) { self.aiCarrier(p, dt); return; }
@@ -159,9 +159,20 @@
   };
 
   S.aiReceive = function (p, dt) {
-    var b = this.ball;
+    var b = this.ball, ps = b.pass;
     var sp = Math.sqrt(b.vx * b.vx + b.vz * b.vz);
-    if (sp < 0.6) { this.moveTo(p, b.x, b.z, 1, true); return; }
+    if (sp < 0.6 && b.y < 0.6) { this.moveTo(p, b.x, b.z, 1, true); return; }
+    /* bola lambung / operan ke ruang kosong: lari ke titik jatuh (bukan mengejar bayangan bola di udara) */
+    if (ps && (ps.lob || ps.loose) && ps.tx != null) {
+      var far = U.dist(p.x, p.z, ps.tx, ps.tz);
+      if (ps.lob && b.y > 0.6) { this.moveTo(p, ps.tx, ps.tz, 1, far > 2.5); return; }
+      if (ps.loose) {
+        var wx0 = p.x - b.x, wz0 = p.z - b.z, tt0 = sp > 0.6 ? U.clamp((wx0 * b.vx + wz0 * b.vz) / (sp * sp), 0.05, 1.6) : 0;
+        var ix0 = sp > 0.6 ? b.x + b.vx * tt0 * 0.85 : ps.tx, iz0 = sp > 0.6 ? b.z + b.vz * tt0 * 0.85 : ps.tz;
+        if (U.dist(p.x, p.z, ix0, iz0) > far) { ix0 = ps.tx; iz0 = ps.tz; }
+        this.moveTo(p, ix0, iz0, 1, U.dist(p.x, p.z, ix0, iz0) > 2.5); return;
+      }
+    }
     var wx = p.x - b.x, wz = p.z - b.z;
     var tt = (wx * b.vx + wz * b.vz) / (sp * sp);
     tt = U.clamp(tt, 0.05, 1.6);

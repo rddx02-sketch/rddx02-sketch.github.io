@@ -4,33 +4,34 @@
   var BA = root.BA, U = BA.U;
   var I = BA.Input = {
     jx: 0, jy: 0, kx: 0, ky: 0, sx: 0, sy: 0, zc: 0, zr: 1,
-    passSeq: 0, gocekSeq: 0, switchSeq: 0, shootSeq: 0, skipSeq: 0,
+    passSeq: 0, gocekSeq: 0, switchSeq: 0, shootSeq: 0, skipSeq: 0, lobSeq: 0,
     shootHeld: false, chargeStart: 0, charge: 0, lastCharge: 0, sprint: false,
+    passHeld: false, passStart: 0, passCharge: 0, lobHeld: false, lobStart: 0, lobCharge: 0,
     autoSprint: true, sprintBtn: false, enabled: false, cine: false,
     onPause: null, onSkip: null, onCam: null, onDevice: null, onNav: null, onOk: null, onBack: null, onPadChange: null,
     joy: { id: null, ox: 0, oy: 0, x: 0, y: 0, active: false },
     device: 'touch', rumbleOn: true, deadzone: 0.2,
     padOk: false, padId: '', padIdx: null, padStyleCur: 'ps', cap: null
   };
-  var CHARGE_MS = 1100;
+  var CHARGE_MS = 1100, PASS_MS = 900; /* tahan tombol oper/lambung: tenaga penuh setelah 0,9 dtk */
 
   function now() { return (root.performance && root.performance.now) ? root.performance.now() : Date.now(); }
 
   /* ---------- daftar aksi & tombol bawaan ---------- */
   I.ACTIONS = [
     { id: 'up', n: 'Gerak ke atas' }, { id: 'down', n: 'Gerak ke bawah' }, { id: 'left', n: 'Gerak ke kiri' }, { id: 'right', n: 'Gerak ke kanan' },
-    { id: 'sprint', n: 'Sprint (tahan)' }, { id: 'pass', n: 'Oper / lempar bola' }, { id: 'shoot', n: 'Tendang (tahan, lepas)' },
+    { id: 'sprint', n: 'Sprint (tahan)' }, { id: 'pass', n: 'Oper datar (tahan = lebih kencang)' }, { id: 'lob', n: 'Oper lambung (tahan = lebih jauh)' }, { id: 'shoot', n: 'Tendang (tahan, lepas)' },
     { id: 'gocek', n: 'Gocek / rebut bola' }, { id: 'switch', n: 'Ganti pemain' }, { id: 'cam', n: 'Ganti kamera' },
     { id: 'skip', n: 'Lewati adegan' }, { id: 'pause', n: 'Jeda' }
   ];
   I.DEF_KEYS = {
     up: ['KeyW', 'ArrowUp'], down: ['KeyS', 'ArrowDown'], left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'],
-    sprint: ['ShiftLeft', 'ShiftRight'], pass: ['KeyJ', ''], shoot: ['KeyK', ''], gocek: ['KeyL', ''], switch: ['KeyI', ''],
+    sprint: ['ShiftLeft', 'ShiftRight'], pass: ['KeyJ', ''], lob: ['KeyU', ''], shoot: ['KeyK', ''], gocek: ['KeyL', ''], switch: ['KeyI', ''],
     cam: ['KeyC', ''], skip: ['Space', ''], pause: ['Escape', 'KeyP']
   };
   /* indeks tombol "standard gamepad": 0 ✕, 1 ○, 2 □, 3 △, 4 L1, 5 R1, 6 L2, 7 R2, 8 SHARE, 9 OPTIONS, 10 L3, 11 R3, 12-15 D-pad */
   I.DEF_PAD = {
-    up: [12, -1], down: [13, -1], left: [14, -1], right: [15, -1], sprint: [5, 7], pass: [0, -1], shoot: [2, -1],
+    up: [12, -1], down: [13, -1], left: [14, -1], right: [15, -1], sprint: [5, 7], pass: [0, -1], lob: [6, -1], shoot: [2, -1],
     gocek: [1, -1], switch: [3, 4], cam: [11, -1], skip: [8, -1], pause: [9, -1]
   };
   var BLOCKED = { Tab: 1, MetaLeft: 1, MetaRight: 1, ContextMenu: 1, F5: 1, F11: 1, F12: 1, OSLeft: 1, OSRight: 1 };
@@ -149,7 +150,8 @@
       if (document.body) document.body.classList.remove('kbnav');
     }, { capture: true, passive: true });
     bindBtn(els.shoot, function () { if (I.cine) { skipNow(); return; } shootDown(); }, function () { shootUp(); });
-    bindBtn(els.pass, function () { if (I.cine) { skipNow(); return; } I.passSeq++; tick(); });
+    bindBtn(els.pass, function () { if (I.cine) { skipNow(); return; } passDown(); }, function () { passUp(); });
+    bindBtn(els.lob, function () { if (I.cine) { skipNow(); return; } lobDown(); }, function () { lobUp(); });
     bindBtn(els.gocek, function () { if (I.cine) { skipNow(); return; } I.gocekSeq++; I.gocekBtn = true; I.gocekAt = now(); tick(); }, function () { I.gocekBtn = false; });
     bindBtn(els.sw, function () { I.switchSeq++; tick(); });
     bindBtn(els.sprint, function () { I.sprintBtn = true; tick(); }, function () { I.sprintBtn = false; });
@@ -201,7 +203,22 @@
     I.shootHeld = false;
     I.shootSeq++;
   }
-  I.cancelShoot = function () { I.shootHeld = false; I.charge = 0; };
+  /* oper datar: ketuk = tenaga otomatis (0), ditahan = tenaga 0,15..1,2 sesuai lama tahan */
+  function passDown() { if (I.passHeld) return; I.passHeld = true; I.passStart = now(); I.passCharge = 0; tick(); }
+  function passUp() {
+    if (!I.passHeld) return;
+    var h = now() - I.passStart;
+    I.passCharge = h < 140 ? 0 : Math.min(1.2, 0.15 + h / PASS_MS);
+    I.passHeld = false; I.passSeq++;
+  }
+  function lobDown() { if (I.lobHeld) return; I.lobHeld = true; I.lobStart = now(); I.lobCharge = 0; tick(); }
+  function lobUp() {
+    if (!I.lobHeld) return;
+    var h = now() - I.lobStart;
+    I.lobCharge = Math.min(1.2, Math.max(0.2, h / PASS_MS));
+    I.lobHeld = false; I.lobSeq++;
+  }
+  I.cancelShoot = function () { I.shootHeld = false; I.charge = 0; I.passHeld = false; I.lobHeld = false; };
   I.setCine = function (on) {
     on = !!on;
     if (on && !I.cine) I.cancelShoot();
@@ -259,11 +276,12 @@
     if (a === 'pause') { if (down && I.onPause) I.onPause(); return; }
     if (!I.enabled) return;
     if (I.cine) {
-      if (down && (a === 'skip' || a === 'pass' || a === 'shoot' || a === 'gocek')) skipNow();
+      if (down && (a === 'skip' || a === 'pass' || a === 'lob' || a === 'shoot' || a === 'gocek')) skipNow();
       return;
     }
     switch (a) {
-      case 'pass': if (down) I.passSeq++; break;
+      case 'pass': if (down) passDown(); else passUp(); break;
+      case 'lob': if (down) lobDown(); else lobUp(); break;
       case 'gocek': if (down) { I.gocekSeq++; I.gocekAt = now(); } break;
       case 'switch': if (down) I.switchSeq++; break;
       case 'shoot': if (down) shootDown(); else shootUp(); break;
@@ -320,6 +338,7 @@
     I.ACTIONS.forEach(function (a) { st[a.id].k = 0; st[a.id].p = 0; });
     I.sprintBtn = false; I.gocekBtn = false; I.gocekAt = 0; I.chase = false;
     if (I.shootHeld) { I.shootHeld = false; I.lastCharge = Math.max(0.5, Math.min(0.8, I.charge)); I.charge = 0; }
+    I.passHeld = false; I.lobHeld = false;
     I.joy.id = null; I.joy.active = false; I.jx = 0; I.jy = 0;
     drawJoy();
     if (I.els) [I.els.shoot, I.els.pass, I.els.gocek, I.els.sw, I.els.sprint].forEach(function (b) { if (b) b.classList.remove('on'); });
@@ -448,6 +467,8 @@
       I.charge = Math.min(1.2, (now() - I.chargeStart) / CHARGE_MS);
       if (I.charge >= 1.2) shootUp();
     }
+    if (I.passHeld) { var ph = now() - I.passStart; I.passCharge = ph < 140 ? 0 : Math.min(1.2, 0.15 + ph / PASS_MS); if (ph > PASS_MS * 1.3) passUp(); }
+    if (I.lobHeld) { var lh = now() - I.lobStart; I.lobCharge = Math.min(1.2, Math.max(0.2, lh / PASS_MS)); if (lh > PASS_MS * 1.3) lobUp(); }
     var x, y;
     // prioritas: joystick layar, lalu tombol arah (keyboard/D-pad), lalu analog stik (analog yang sedikit "drift" tidak mengalahkan keyboard)
     if (I.joy.active) { x = I.jx; y = I.jy; }
@@ -469,9 +490,13 @@
   I.toSim = function (wx, wz) {
     return {
       mx: wx, mz: wz, sprint: I.sprint, passSeq: I.passSeq, gocekSeq: I.gocekSeq, switchSeq: I.switchSeq,
-      shootHeld: I.shootHeld, shootSeq: I.shootSeq, charge: I.shootHeld ? I.charge : I.lastCharge, zc: I.zc, zr: I.zr, skipSeq: I.skipSeq, chase: !!I.chase
+      shootHeld: I.shootHeld, shootSeq: I.shootSeq, charge: I.shootHeld ? I.charge : I.lastCharge, zc: I.zc, zr: I.zr, skipSeq: I.skipSeq, chase: !!I.chase,
+      passCharge: I.passCharge, lobSeq: I.lobSeq, lobCharge: I.lobCharge
     };
   };
   I.chargeNow = function () { return I.shootHeld ? I.charge : 0; };
+  /* tenaga yang sedang diisi di tombol oper/lambung (untuk cincin tombol) */
+  I.passChargeNow = function () { return I.passHeld ? I.passCharge : 0; };
+  I.lobChargeNow = function () { return I.lobHeld ? I.lobCharge : 0; };
   I.setEnabled = function (on) { I.enabled = !!on; if (!on) { I.releaseAll(); I.cine = false; } };
 })(typeof window !== 'undefined' ? window : globalThis);

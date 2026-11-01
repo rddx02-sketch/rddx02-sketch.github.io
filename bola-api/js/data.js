@@ -125,7 +125,9 @@
     { id: 'kabut', name: 'Kabut Pagi', desc: 'Jarak pandang pendek. Refleks kiper −7%.', keep: 0.93, fog: 0.05 },
     { id: 'kemarau', name: 'Kemarau Berdebu', desc: 'Terik dan berdebu. Stamina cepat habis, bola memantul tinggi.', stam: 1.45, bounceMul: 1.15, dust: 1 },
     { id: 'gerimis', name: 'Gerimis Senja', desc: 'Gerimis tipis, langit jingga keunguan. Sedikit licin.', shot: 0.97, keepNormal: 0.95, fric: 1.1, rain: 0.35, dusk: 1 },
-    { id: 'badai', name: 'Badai Petir', desc: 'Hujan dan petir. Petir bisa menyambar bola jadi Bola Petir (+25%).', shot: 0.95, keepNormal: 0.9, fric: 1.25, rain: 1, dark: 0.75, lightning: 1 }
+    { id: 'badai', name: 'Badai Petir', desc: 'Hujan dan petir. Petir bisa menyambar bola jadi Bola Petir (+25%).', shot: 0.95, keepNormal: 0.9, fric: 1.25, rain: 1, dark: 0.75, lightning: 1 },
+    { id: 'salju', name: 'Lapangan Bersalju', desc: 'Salju turun di atas lapangan putih. Bola tertahan salju (lebih lambat, pantulan rendah), stamina lebih cepat habis. Garis lapangan merah.', shot: 0.94, keepNormal: 0.93, fric: 1.55, bounceMul: 0.55, stam: 1.2, snow: 1, snowGround: 1 },
+    { id: 'hujansalju', name: 'Hujan Salju', desc: 'Salju turun lebat, lapangan masih hijau. Jarak pandang berkurang, bola sedikit licin.', shot: 0.97, keep: 0.95, fric: 1.12, snow: 1.3 }
   ];
   D.weatherById = {};
   D.WEATHERS.forEach(function (w) { D.weatherById[w.id] = w; });
@@ -152,7 +154,7 @@
   D.DIFFS = [{ id: 0, n: 'Mudah' }, { id: 1, n: 'Sedang' }, { id: 2, n: 'Sulit' }];
   D.RULESETS = [
     { id: 'tarkam', n: 'Tarkam', desc: 'Aturan kampung: pagar pantul atau bola keluar, 3 pojok = penalti, bola panas. Tanpa offside.' },
-    { id: 'pro', n: 'Liga Pro', desc: 'Aturan sepak bola resmi: offside, pelanggaran = tendangan bebas, pelanggaran di kotak = penalti, kartu kuning/merah, lemparan ke dalam, sepak pojok, tendangan gawang. Paling pas di lapangan Ukuran Asli 11 vs 11 dengan Stadion.' }
+    { id: 'pro', n: 'Liga Pro', desc: 'Aturan sepak bola resmi: dua babak dengan tukar sisi, offside, pelanggaran = tendangan bebas, pelanggaran di kotak = penalti, kartu kuning/merah, lemparan ke dalam, sepak pojok, tendangan gawang, kiper tak boleh menangkap back-pass. Paling pas di lapangan Ukuran Asli 11 vs 11 dengan Stadion.' }
   ];
   D.defaultRules = function () { return { dur: 240, tie: 'penalti', bound: 'pantul', tigaPojok: true, bolaPanas: true, diff: 1, pro: false }; };
   /* aturan resmi memaksa bola keluar & mematikan aturan kampung */

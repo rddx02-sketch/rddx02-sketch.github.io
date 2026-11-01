@@ -14,7 +14,8 @@
     malam: { top: '#03040c', hor: '#1a1c3a', sun: '#9fb4ff', si: 0.28, hs: '#4a5578', hg: '#1a1410', hi: 0.42, fog: '#11132a', sunPos: [40, 60, -60], cloud: '#2a3050' },
     mendung: { top: '#4b5563', hor: '#9aa3ad', sun: '#d7dee8', si: 0.55, hs: '#b0b9c5', hg: '#3d3a35', hi: 0.68, fog: '#8f98a3', sunPos: [10, 70, -50], cloud: '#8a929c' },
     pagi: { top: '#9fb3c8', hor: '#e9eff3', sun: '#fff4e0', si: 0.75, hs: '#e3eaf0', hg: '#5d5a50', hi: 0.7, fog: '#dde5ea', sunPos: [70, 25, -60], cloud: '#f4f6f8' },
-    terik: { top: '#5aa6ea', hor: '#ffeac0', sun: '#fff1c9', si: 1.0, hs: '#f4f0e6', hg: '#6a5a40', hi: 0.64, fog: '#efe0bd', sunPos: [10, 95, -20], cloud: '#fffaf0' }
+    terik: { top: '#5aa6ea', hor: '#ffeac0', sun: '#fff1c9', si: 1.0, hs: '#f4f0e6', hg: '#6a5a40', hi: 0.64, fog: '#efe0bd', sunPos: [10, 95, -20], cloud: '#fffaf0' },
+    salju: { top: '#8c9bb0', hor: '#dfe6ee', sun: '#f4f7fb', si: 0.62, hs: '#e8eef5', hg: '#5a6270', hi: 0.78, fog: '#d5dde6', sunPos: [20, 60, -50], cloud: '#c9d2dc' }
   };
 
   var SURF = {
@@ -25,11 +26,13 @@
     tanahmerah: { base: '#a05a3a', a: '#ad6845', b: '#8c4c30', worn: '#7c4329', out: '#7a5e44', line: '#f6efe4', det: 'dirt' },
     aspal: { base: '#5a5d63', a: '#64676d', b: '#4f5258', worn: '#46484d', out: '#76787c', line: '#f5f1e6', det: 'asphalt' },
     tanah: { base: '#8b6a45', a: '#9b7a52', b: '#7a5c3a', worn: '#6e5234', out: '#6f6a40', line: '#f6f1e3', det: 'dirt' },
-    stadion: { base: '#3f8a35', a: '#4d9c41', b: '#357a2d', worn: '#4a8a3a', out: '#2f6a2a', line: '#ffffff', det: 'grass', neat: true }
+    stadion: { base: '#3f8a35', a: '#4d9c41', b: '#357a2d', worn: '#4a8a3a', out: '#2f6a2a', line: '#ffffff', det: 'grass', neat: true },
+    salju: { base: '#eef2f6', a: '#e6ebf0', b: '#dde3e9', worn: '#cfd6dd', out: '#e9edf1', line: '#e0512f', det: 'sand', neat: true, snow: true }
   };
 
   function timeOf(arena, weather) {
     if (weather.night) return 'malam';
+    if (weather.snow) return 'salju';
     if (weather.dusk) return 'senja';
     if (weather.rain) return 'mendung';
     if (weather.fog) return 'pagi';
@@ -909,7 +912,7 @@
   }
 
   function clouds(A, rnd, T, tk, w) {
-    var n = w.rain ? 12 : (tk === 'malam' ? 5 : 9);
+    var n = (w.rain || w.snow) ? 12 : (tk === 'malam' ? 5 : 9);
     var col = new THREE.Color(T.cloud || '#ffffff');
     var list = [];
     for (var i = 0; i < n; i++) {
@@ -1408,6 +1411,37 @@
       for (i = 0; i < np; i++) { m4.compose(new V3((rnd() - 0.5) * F.L, 0.02, (rnd() - 0.5) * F.W), qq, new V3(1 + rnd() * 2, 0.6 + rnd(), 1)); pud.setMatrixAt(i, m4); }
       pud.instanceMatrix.needsUpdate = true; G.add(pud);
     }
+    if (w.snow) {
+      /* butiran salju: titik lembut turun pelan sambil melayang */
+      var sn = Math.round([220, 480, 800][q] * (w.snow > 1 ? 1.4 : 1));
+      var sp3 = new Float32Array(sn * 3), sv = new Float32Array(sn), sph = new Float32Array(sn);
+      for (var si = 0; si < sn; si++) { sp3[si * 3] = (rnd() - 0.5) * 70; sp3[si * 3 + 1] = rnd() * 22; sp3[si * 3 + 2] = (rnd() - 0.5) * 55; sv[si] = 1.1 + rnd() * 1.4; sph[si] = rnd() * 6.3; }
+      var sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(sp3, 3));
+      var sm = new THREE.PointsMaterial({ color: 0xffffff, size: w.snow > 1 ? 0.5 : 0.4, map: R3.tex.soft, transparent: true, opacity: 0.95, depthWrite: false, sizeAttenuation: true });
+      A.disposables.push(sg, sm);
+      var spts = new THREE.Points(sg, sm); spts.frustumCulled = false; G.add(spts);
+      A.updaters.push(function (dt) {
+        var p = sg.attributes.position.array, cx = A.focusX || 0, cz = A.focusZ || 0, t = A.t;
+        for (var i = 0; i < sn; i++) {
+          var j = i * 3;
+          p[j + 1] -= sv[i] * dt;
+          p[j] += (Math.sin(t * 0.9 + sph[i]) * 0.6 + 0.4) * dt; p[j + 2] += Math.cos(t * 0.7 + sph[i]) * 0.5 * dt;
+          if (p[j + 1] < 0 || Math.abs(p[j] - cx) > 40) { p[j] = cx + (Math.random() - 0.5) * 70; p[j + 1] = 18 + Math.random() * 6; p[j + 2] = cz * 0.6 + (Math.random() - 0.5) * 55; }
+        }
+        sg.attributes.position.needsUpdate = true;
+      });
+      if (w.snowGround) {
+        /* gundukan salju di tepi lapangan (hasil disapu) */
+        var nb = Math.round(10 * (F.L / 44));
+        var bankM = R3.mat('#f3f6f9'); var bank = new THREE.InstancedMesh(R3.geo.sphere || new THREE.SphereGeometry(1, 10, 7), bankM, nb);
+        var mb = new THREE.Matrix4();
+        for (var bi = 0; bi < nb; bi++) {
+          var side = bi % 2 ? 1 : -1, bx = (rnd() - 0.5) * (F.L + 4), bz = side * (F.W / 2 + 2.2 + rnd() * 1.5);
+          mb.compose(new V3(bx, -0.25, bz), new THREE.Quaternion(), new V3(1.6 + rnd() * 2.2, 0.55 + rnd() * 0.3, 1 + rnd() * 0.8)); bank.setMatrixAt(bi, mb);
+        }
+        bank.instanceMatrix.needsUpdate = true; bank.receiveShadow = true; G.add(bank);
+      }
+    }
     if (w.dust || w.wind) {
       var dn = [60, 120, 200][q];
       var dp = new Float32Array(dn * 3), dv = [];
@@ -1466,7 +1500,7 @@
 
     // ---- langit ----
     var skyMat = new THREE.ShaderMaterial({
-      uniforms: { top: { value: new THREE.Color(T.top) }, hor: { value: new THREE.Color(T.hor) }, bot: { value: new THREE.Color(U.mixHex(T.hor, '#000000', 0.5)) }, sunDir: { value: new V3(T.sunPos[0], T.sunPos[1], T.sunPos[2]).normalize() }, sunCol: { value: new THREE.Color(T.sun) }, glow: { value: (weather.rain || weather.fog) ? 0.0 : (tk === 'malam' ? 0.15 : 0.55) } },
+      uniforms: { top: { value: new THREE.Color(T.top) }, hor: { value: new THREE.Color(T.hor) }, bot: { value: new THREE.Color(U.mixHex(T.hor, '#000000', 0.5)) }, sunDir: { value: new V3(T.sunPos[0], T.sunPos[1], T.sunPos[2]).normalize() }, sunCol: { value: new THREE.Color(T.sun) }, glow: { value: (weather.rain || weather.fog || weather.snow) ? 0.0 : (tk === 'malam' ? 0.15 : 0.55) } },
       vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
       fragmentShader: 'uniform vec3 top; uniform vec3 hor; uniform vec3 bot; uniform vec3 sunDir; uniform vec3 sunCol; uniform float glow; varying vec3 vP;' +
         'void main(){ float h = vP.y; vec3 c = h > 0.0 ? mix(hor, top, pow(clamp(h,0.0,1.0), 0.55)) : mix(hor, bot, clamp(-h*4.0,0.0,1.0));' +
@@ -1479,7 +1513,7 @@
     var sunDir = new V3(T.sunPos[0], T.sunPos[1], T.sunPos[2]).normalize();
     var sunSpr = new THREE.Sprite(new THREE.SpriteMaterial({ map: R3.tex.glow, color: new THREE.Color(tk === 'malam' ? '#dfe6ff' : T.sun), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
     sunSpr.position.copy(sunDir).multiplyScalar(280); sunSpr.scale.setScalar(tk === 'malam' ? 18 : (tk === 'senja' ? 70 : 46));
-    if (!weather.rain && !weather.fog) G.add(sunSpr);
+    if (!weather.rain && !weather.fog && !weather.snow) G.add(sunSpr);
     if (tk === 'malam') {
       var sn = q === 0 ? 150 : 400, sp = new Float32Array(sn * 3);
       for (var i = 0; i < sn; i++) { var th = rnd() * Math.PI * 2, ph = 0.08 + rnd() * 1.3; sp[i * 3] = Math.cos(th) * Math.cos(ph) * 300; sp[i * 3 + 1] = Math.sin(ph) * 300; sp[i * 3 + 2] = Math.sin(th) * Math.cos(ph) * 300; }
@@ -1509,14 +1543,15 @@
     var fogFar = Math.max(1, F.L / 44);
     if (weather.fog) scene.fog = new THREE.FogExp2(new THREE.Color(T.fog), weather.fog * 0.9 / Math.sqrt(fogFar));
     else if (weather.rain) scene.fog = new THREE.Fog(new THREE.Color(T.fog), 25 * fogFar, 150 + 40 * fogFar);
+    else if (weather.snow) scene.fog = new THREE.Fog(new THREE.Color(T.fog), (weather.snow > 1 ? 18 : 30) * fogFar, (weather.snow > 1 ? 120 : 170) + 40 * fogFar);
     else if (tk === 'malam') scene.fog = new THREE.Fog(new THREE.Color(T.fog), 45 * fogFar, 220 + 30 * fogFar);
     else scene.fog = new THREE.Fog(new THREE.Color(T.fog), 90 + 20 * fogFar, 330);
 
     // ---- tanah & lapangan ----
-    var S = SURF[arena.surface] || SURF.rumput;
+    var S = SURF[weather.snowGround ? 'salju' : arena.surface] || SURF.rumput;
     var outer = R3.mesh(arena.id === 'bukit' ? new THREE.CircleGeometry(Math.max(70, F.L * 0.8), 48) : new THREE.PlaneGeometry(800, 800), R3.mat(S.out), 0, -0.02, 0);
     outer.rotation.x = -Math.PI / 2; outer.receiveShadow = true; G.add(outer);
-    buildField(A, S, arena.surface, q);
+    buildField(A, S, weather.snowGround ? 'salju' : arena.surface, q);
     buildGoals(A, arena);
     buildFence(A, arena, rnd);
     buildBoards(A, rnd);

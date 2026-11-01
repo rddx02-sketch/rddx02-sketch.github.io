@@ -210,6 +210,10 @@ body.fsOn .fsBtn { opacity: 0.55; }
 #bGocek { right: 112px; bottom: 96px; width: 72px; height: 72px; border-color: var(--aura); }
 #bSwitch { right: 30px; bottom: 136px; width: 56px; height: 56px; font-size: 10px; }
 #bSprint { right: 192px; bottom: 92px; width: 60px; height: 60px; font-size: 10px; border-color: #3ddc84; }
+#bLob { right: 212px; bottom: 8px; width: 60px; height: 60px; font-size: 9.5px; border-color: #7cc7ff; }
+/* cincin tenaga saat tombol oper/lambung ditahan */
+.pbtn.charging { background: conic-gradient(var(--flame) calc(var(--ch, 0) * 1turn), rgba(20,10,24,0.6) 0); box-shadow: 0 0 18px rgba(255,106,26,0.5); }
+.pbtn.charging.full { background: conic-gradient(#fff 1turn, #fff 0); color: #170e1b; }
 #controls.custom .pad { inset: 0; width: auto; height: auto; transform: none; }
 #controls.custom .pbtn { right: auto; bottom: auto; left: var(--lx, 50%); top: var(--ly, 50%); transform: translate(-50%, -50%) scale(var(--ls, 1)); }
 #controls.custom .pbtn.on { transform: translate(-50%, -50%) scale(calc(var(--ls, 1) * 0.92)); }
@@ -232,7 +236,7 @@ body.layoutEdit #joyZone::after { content: 'AREA JOYSTICK'; position: absolute; 
 body.layoutEdit .joyHint { display: none !important; }
 body.layoutEdit .leSel { outline: 3px solid var(--flame) !important; outline-offset: 4px; box-shadow: 0 0 0 6px rgba(255,194,61,0.25); }
 body.layoutEdit .fsBtn { display: none; }
-#controls.penMode #bPass, #controls.penMode #bGocek, #controls.penMode #bSwitch, #controls.penMode #bSprint { display: none; }
+#controls.penMode #bPass, #controls.penMode #bLob, #controls.penMode #bGocek, #controls.penMode #bSwitch, #controls.penMode #bSprint { display: none; }
 body.hidepad #controls .pad, body.hidepad .joyHint { display: none; }
 /* petunjuk tombol keyboard / stik */
 .keyLegend { position: absolute; right: max(14px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); display: none; flex-direction: column; align-items: flex-end; gap: 5px; font-size: 13px; font-weight: 600; color: var(--chalk); pointer-events: none; text-shadow: 0 1px 2px #000; }
@@ -389,6 +393,7 @@ body.showlegend .comment { max-width: min(560px, max(260px, calc(100vw - 360px))
 @media (orientation: portrait) {
   .pad { width: 226px; height: 250px; }
   #bSprint { right: 136px; bottom: 182px; width: 56px; height: 56px; }
+  #bLob { right: 200px; bottom: 8px; width: 54px; height: 54px; }
   .keyLegend { bottom: calc(env(safe-area-inset-bottom, 0px) + 60px); }
   #aim { right: 50%; transform: translateX(50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 236px); }
   .comment { bottom: calc(env(safe-area-inset-bottom, 0px) + 226px); max-width: 86vw; }

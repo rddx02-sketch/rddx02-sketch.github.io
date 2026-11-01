@@ -55,7 +55,11 @@
 
   A.click = function () { tone(900, 0.05, 'triangle', 0.12); };
   A.kick = function (v) { v = v || 1; tone(150, 0.14, 'sine', 0.55 * v, 45); noise(0.05, 0.25 * v, 'highpass', 2500); };
-  A.pass = function () { tone(220, 0.08, 'sine', 0.3, 90); noise(0.03, 0.12, 'highpass', 3000); };
+  A.pass = function (pow, lob) {
+    var k = 1 + Math.min(1.2, Math.max(0, (+pow || 0) / 100)) * 0.7; /* operan bertenaga: pukulan lebih berat */
+    if (lob) { tone(170, 0.12, 'triangle', 0.3 * k, 70); noise(0.05, 0.16 * k, 'bandpass', 1400, 1.1); A.whoosh(0.5 * k); return; }
+    tone(220 - 40 * (k - 1), 0.08, 'sine', 0.3 * k, 90); noise(0.03, 0.12 * k, 'highpass', 3000);
+  };
   A.bounce = function (v) { tone(120, 0.08, 'sine', 0.18 * (v || 0.5), 60); };
   A.tackle = function () { noise(0.12, 0.3, 'lowpass', 600); tone(90, 0.1, 'sine', 0.3, 50); };
   A.whoosh = function (k) { noise(0.55, 0.25 * (k || 1), 'bandpass', 400, 1.2, 3500, 0, 0.12); };

@@ -482,11 +482,13 @@
     if (!Array.isArray(a)) return null;
     return {
       mx: U.num(a[0], 0) / 100, mz: U.num(a[1], 0) / 100, sprint: !!a[2], passSeq: a[3] | 0, gocekSeq: a[4] | 0, switchSeq: a[5] | 0,
-      shootHeld: !!a[6], shootSeq: a[7] | 0, charge: U.num(a[8], 0) / 100, zc: a[9] | 0, zr: a[10] | 0, skipSeq: a[11] | 0, chase: !!a[12]
+      shootHeld: !!a[6], shootSeq: a[7] | 0, charge: U.num(a[8], 0) / 100, zc: a[9] | 0, zr: a[10] | 0, skipSeq: a[11] | 0, chase: !!a[12],
+      passCharge: U.num(a[13], 0) / 100, lobSeq: a[14] | 0, lobCharge: U.num(a[15], 0) / 100
     };
   };
   Net.packInput = function (inp) {
-    return [Math.round(inp.mx * 100), Math.round(inp.mz * 100), inp.sprint ? 1 : 0, inp.passSeq, inp.gocekSeq, inp.switchSeq, inp.shootHeld ? 1 : 0, inp.shootSeq, Math.round(inp.charge * 100), inp.zc, inp.zr, inp.skipSeq, inp.chase ? 1 : 0];
+    return [Math.round(inp.mx * 100), Math.round(inp.mz * 100), inp.sprint ? 1 : 0, inp.passSeq, inp.gocekSeq, inp.switchSeq, inp.shootHeld ? 1 : 0, inp.shootSeq, Math.round(inp.charge * 100), inp.zc, inp.zr, inp.skipSeq, inp.chase ? 1 : 0,
+      Math.round((inp.passCharge || 0) * 100), inp.lobSeq | 0, Math.round((inp.lobCharge || 0) * 100)];
   };
 
   /* ---------- tampilan jarak jauh (tamu) ---------- */
@@ -509,11 +511,11 @@
     this.ball = { x: 0, y: 0.13, z: 0, owner: null, petirT: 0, holdT: 0, vx: 0, vz: 0 };
     this.score = [0, 0]; this.sem = [0, 0]; this.clock = this.rules.dur; this.phase = 'kickoff'; this.timeScale = 1;
     this.active = [null, null]; this.aim = null; this.pen = null; this.shootout = null; this.revealed = [{}, {}]; this.corners = [0, 0];
-    this.golden = false; this.winner = -1; this.goalTeam = -1;
+    this.golden = false; this.winner = -1; this.goalTeam = -1; this.half = 1; this.swap = false; this.coop = !!cfg.coop; this.active2 = null;
     this.buf = []; this.lastEv = 0; this.renderHt = null; this.got = false; this.lastRecv = 0;
-    this.humans = [true, true];
+    this.humans = this.coop ? [true, false] : [true, true];
   };
-  RemoteView.prototype.dirOf = function (team) { return team === 0 ? 1 : -1; };
+  RemoteView.prototype.dirOf = function (team) { return (team === 0 ? 1 : -1) * (this.swap ? -1 : 1); };
   RemoteView.prototype.pl = function (t, i) { return (i >= 0 && i < this.n) ? (this.players[t * this.n + i] || null) : null; };
   RemoteView.prototype.oppGoalX = function (team) { return this.dirOf(team) * D.FIELD.L / 2; };
   RemoteView.prototype.inShotRange = function (p) { var F = D.FIELD; return U.dist(p.x, p.z, this.oppGoalX(p.team), 0) < F.shot && Math.abs(p.z) < Math.max(12.5, F.boxW / 2 + 4); };
@@ -549,6 +551,8 @@
     this.golden = !!s.gg;
     this.winner = U.num(s.wn, -1);
     this.goalTeam = U.num(s.gt, -1);
+    this.half = U.num(s.hf, 1); this.swap = !!s.sw;
+    this.active2 = (s.a2 >= 0 && s.a2 < this.n) ? this.pl(0, s.a2) : null;
     if (Array.isArray(s.pn)) {
       this.pen = { state: Sim.PEN_STATES[s.pn[0]] || 'setup', team: s.pn[1] | 0, kind: ['single', 'shootout', 'practice'][s.pn[2]] || 'single', shooter: this.pl(s.pn[1] | 0, s.pn[3] | 0) };
     } else this.pen = null;

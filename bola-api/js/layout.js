@@ -4,8 +4,8 @@
   var BA = root.BA, U = BA.U;
   var $ = function (id) { return document.getElementById(id); };
   var L = BA.Layout = {};
-  var IDS = ['bShoot', 'bPass', 'bGocek', 'bSwitch', 'bSprint', 'joyZone'];
-  var NAMES = { bShoot: 'Tendang', bPass: 'Oper', bGocek: 'Gocek', bSwitch: 'Ganti', bSprint: 'Sprint', joyZone: 'Area joystick' };
+  var IDS = ['bShoot', 'bPass', 'bLob', 'bGocek', 'bSwitch', 'bSprint', 'joyZone'];
+  var NAMES = { bShoot: 'Tendang', bPass: 'Oper', bLob: 'Lambung', bGocek: 'Gocek', bSwitch: 'Ganti', bSprint: 'Sprint', joyZone: 'Area joystick' };
   var JOY_W = 0.46, JOY_H = 0.68; // ukuran bawaan area joystick (bagian layar)
   L.IDS = IDS;
   L.editing = false;
@@ -23,7 +23,7 @@
       var mm = {}, ok = true;
       IDS.forEach(function (id) {
         var e = m[id];
-        if (!e || typeof e !== 'object') { ok = false; return; }
+        if (!e || typeof e !== 'object') { if (id === 'bLob') e = defaultMap()[id]; else { ok = false; return; } } /* tombol baru: tata letak lama tetap dipakai */
         mm[id] = { x: U.clamp(U.num(e.x, 0.5), 0, 1), y: U.clamp(U.num(e.y, 0.5), 0, 1), s: U.clamp(U.num(e.s, 1), 0.6, 1.5) };
       });
       if (ok) { out[o] = mm; any = true; }
@@ -103,7 +103,7 @@
     return capture(ov) || defaultMap();
   };
   function defaultMap() {
-    return { bShoot: { x: 0.9, y: 0.82, s: 1 }, bPass: { x: 0.74, y: 0.88, s: 1 }, bGocek: { x: 0.74, y: 0.66, s: 1 }, bSwitch: { x: 0.9, y: 0.58, s: 1 }, bSprint: { x: 0.58, y: 0.7, s: 1 }, joyZone: { x: 0.23, y: 0.66, s: 1 } };
+    return { bShoot: { x: 0.9, y: 0.82, s: 1 }, bPass: { x: 0.74, y: 0.88, s: 1 }, bLob: { x: 0.6, y: 0.9, s: 1 }, bGocek: { x: 0.74, y: 0.66, s: 1 }, bSwitch: { x: 0.9, y: 0.58, s: 1 }, bSprint: { x: 0.58, y: 0.7, s: 1 }, joyZone: { x: 0.23, y: 0.66, s: 1 } };
   }
 
   L.select = function (id) {

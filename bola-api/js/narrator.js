@@ -113,6 +113,8 @@
     w_kemarau: ['Debu beterbangan! Es teh manis di warung jadi incaran.', 'Panasnya terik, keringat pemain sudah sebesar biji jagung!'],
     w_gerimis: ['Gerimis tipis di senja hari. Romantis, tapi ini pertandingan, bukan kencan!'],
     w_cerah: ['Cuaca cerah, cocok untuk main bola dan menjemur kerupuk.'],
+    w_salju: ['Salju turun di lapangan! Bola jadi berat, pemain jadi mirip salju berjalan.', 'Lapangan putih bersalju, garis merah, bola api... ini sepak bola rasa kutub!', 'Dingin menusuk, tapi bola apinya tetap menyala. Hati-hati terpeleset!'],
+    w_hujansalju: ['Hujan salju turun lebat, jarak pandang menipis. Kiper harus pasang mata lebih lebar!', 'Salju beterbangan di atas lapangan, suasana seperti di negeri dongeng... tapi tekelnya tetap sadis.'],
     a_kampung: ['Umbul-umbul berkibar, suasana kampung meriah sekali!'],
     a_sawah: ['Kerbau di pematang sawah pun ikut menonton dengan serius.'],
     a_pantai: ['Ombak berdebur di belakang gawang. Hati-hati bola nyemplung ke laut!'],
@@ -207,6 +209,8 @@
     ambUlt: ['The spirit bar of {t} is full! Their ultimate is ready!', '{t} are fully fired up! Watch out for the finisher!'],
     ambTired: ['{p} is running on fumes! Too much sprinting!', '{p} is blowing hard. Somebody fetch him an iced tea!'],
     w_hujan: ['The rain is lashing down, but the village spirit will not wash away!', 'Slippery out there! Someone is going on their backside soon!'],
+    w_salju: ['Snow on the pitch! The ball is heavy and the players look like walking snowmen.', 'A white pitch, red lines, a flaming ball... polar football!', 'Freezing cold, but the fire ball still burns. Mind your footing!'],
+    w_hujansalju: ['Heavy snowfall, visibility is dropping. The keeper needs eyes wide open!', 'Snow swirling over the pitch, like a fairy tale... with brutal tackles.'],
     w_badai: ['Lightning everywhere! The ball could become a Thunder Ball any moment!', 'A storm cannot stop tarkam! The fans are staying put!'],
     w_malam: ['The pressure lamps are glowing, and the fire ball burns brighter at night!', 'A Saturday night like this beats any soap opera!'],
     w_angin: ['Gale force winds! A high ball could end up in the neighbour\'s yard!', 'So windy the long hair of these players flaps like the bunting!'],
@@ -250,7 +254,11 @@
       foulPen: ['PENALTI! {p} melanggar {d} di dalam kotak! Wasit tegas menunjuk titik putih!', 'Di dalam kotak penalti! {p} menjatuhkan {d}. Penalti untuk {t}!'],
       cardYellow: ['Kartu kuning untuk {p}! Wasit tidak mau tahu.', '{p} dapat kartu kuning. Sekali lagi, pulang duluan!', 'Kuning! {p} dicatat wasit, nanti dipotong uang saku.'],
       cardRed: ['KARTU MERAH! {p} diusir keluar lapangan! Timnya main dengan sepuluh orang!', 'Merah! {p} harus keluar. Silakan ke warung, Pak, pertandingan lanjut tanpa Anda.', '{p} dikeluarkan wasit! Penonton bersorak, sebagian menyoraki.'],
-      freekick: ['Tendangan bebas untuk {t}. Pagar betis sudah disusun.', 'Tendangan bebas! Posisi bagus untuk mengarah ke gawang.', 'Bola mati untuk {t}. Semua menunggu, siapa yang akan mengambil?']
+      freekick: ['Tendangan bebas untuk {t}. Pagar betis sudah disusun.', 'Tendangan bebas! Posisi bagus untuk mengarah ke gawang.', 'Bola mati untuk {t}. Semua menunggu, siapa yang akan mengambil?'],
+      halfTime: ['Turun minum! Skor sementara {a} {sa} - {sb} {b}. Kedua tim bertukar sisi lapangan.', 'Peluit babak pertama! {a} {sa}, {b} {sb}. Waktunya es teh dan evaluasi pelatih.', 'Babak pertama usai, {sa}-{sb}. Babak kedua, tim bertukar gawang. Jangan salah arah, ya!'],
+      backpass: ['Operan ke kiper! {p} tidak boleh menangkap dengan tangan, main pakai kaki dulu.', 'Back-pass! Kiper {t} harus memainkan bola dengan kaki. Jangan sampai salah umpan!'],
+      powerPass: ['Operan terukur dari {p}! Bola meluncur kencang menyusur tanah.', '{p} melepas operan keras! Penerimanya harus siap kaki.'],
+      lobPass: ['Umpan lambung {p}! Bola terbang melewati kepala bek.', 'Lob cantik dari {p}, bola turun di depan rekannya.', '{p} mencungkil bola, melayang jauh ke depan!']
     },
     en: {
       gocek: ['Sweet skill from {p}! The defender only saw his back!', '{p} sells the dummy! {d} is left behind, probably looking for his wallet!', 'One touch and {p} is through! Village skills, world league flavour!', 'Oh, {p} with the step over! {d} went home the wrong way!'],
@@ -269,7 +277,11 @@
       foulPen: ['PENALTY! {p} fouls {d} inside the box! The referee points to the spot!', 'Inside the penalty area! {p} brings down {d}. Penalty to {t}!'],
       cardYellow: ['Yellow card for {p}! The referee has no patience today.', '{p} goes in the book. One more and he is off!', 'Yellow! {p} is noted, pocket money deducted later.'],
       cardRed: ['RED CARD! {p} is sent off! Down to ten men!', 'Red! {p} has to go. Off to the snack stall, sir, the match goes on without you.', '{p} is dismissed! The crowd cheers, some of them boo.'],
-      freekick: ['Free kick to {t}. The wall is being set.', 'Free kick! A good position to aim at goal.', 'Dead ball for {t}. Everyone waits, who will take it?']
+      freekick: ['Free kick to {t}. The wall is being set.', 'Free kick! A good position to aim at goal.', 'Dead ball for {t}. Everyone waits, who will take it?'],
+      halfTime: ['Half time! {a} {sa} - {sb} {b}. The teams change ends.', 'The first-half whistle! {a} {sa}, {b} {sb}. Time for iced tea and a team talk.', 'First half over at {sa}-{sb}. Second half, they swap goals. Do not run the wrong way!'],
+      backpass: ['Back-pass! {p} cannot pick that up, it has to be played with the feet.', 'A pass back to the keeper! The {t} keeper must use his feet. Careful now!'],
+      powerPass: ['A driven pass from {p}! The ball zips along the ground.', '{p} fires a hard pass! The receiver had better be ready.'],
+      lobPass: ['A lofted pass from {p}! Over the defender\'s head.', 'Lovely chip from {p}, dropping in front of a teammate.', '{p} scoops it up, sailing far forward!']
     }
   };
   Object.keys(EXTRA.id).forEach(function (k) { L.id[k] = EXTRA.id[k]; L.en[k] = EXTRA.en[k]; });
@@ -709,8 +721,12 @@
         M.passes[p.team] = (M.passes[p.team] || 0) + 1;
         if (M.streakT === p.team) M.streak++; else { M.streakT = p.team; M.streak = 1; }
         if (M.streak === 5 || M.streak === 8 || M.streak === 12) N.say('passStreak', { t: teamName(st, p.team), n: M.streak }, 1);
+        else if (e.lob && e.pow && Math.random() < 0.4) N.say('lobPass', { p: p.name }, 1);
         else if (e.lob && Math.random() < 0.3) N.say('longPass', { p: p.name }, 1);
+        else if (e.pow >= 90 && Math.random() < 0.35) N.say('powerPass', { p: p.name }, 1);
         break;
+      case 'half': N.say('halfTime', { a: teamName(st, 0), b: teamName(st, 1), sa: e.sc ? e.sc[0] : 0, sb: e.sc ? e.sc[1] : 0 }, 3, { queue: true }); break;
+      case 'backpass': p = plr(st, e.p); N.say('backpass', { p: p ? p.name : '', t: teamName(st, e.team) }, 1); break;
       case 'tackle':
         p = plr(st, e.p); q = plr(st, e.on);
         if (!p) break;

@@ -17,7 +17,7 @@
     this.t = 0;
     this.fired = {};
     this.done = false;
-    var att = c.team, dir = att === 0 ? 1 : -1;
+    var att = c.team, dir = c.dir === 1 || c.dir === -1 ? c.dir : (att === 0 ? 1 : -1);
     this.dir = dir;
     var gx = dir * F.L / 2;
     var zone = D.zoneById[c.zone] || D.zoneById.C;

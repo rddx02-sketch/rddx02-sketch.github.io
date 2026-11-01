@@ -13,7 +13,7 @@
   var PEN_STATES = ['setup', 'aim', 'cine', 'after', 'done'];
 
   function blankInput() {
-    return { mx: 0, mz: 0, sprint: false, passSeq: 0, gocekSeq: 0, switchSeq: 0, shootHeld: false, shootSeq: 0, charge: 0, zc: 0, zr: 1, skipSeq: 0, chase: false };
+    return { mx: 0, mz: 0, sprint: false, passSeq: 0, gocekSeq: 0, switchSeq: 0, shootHeld: false, shootSeq: 0, charge: 0, zc: 0, zr: 1, skipSeq: 0, chase: false, passCharge: 0, lobSeq: 0, lobCharge: 0 };
   }
 
   var Sim = BA.Sim = function (cfg) {
@@ -30,6 +30,10 @@
     this.weather = D.weatherById[cfg.weather] || D.WEATHERS[0];
     this.ballDef = D.ballById[cfg.ball] || D.BALLS[0];
     this.humans = cfg.humans || [true, false];
+    /* co-op: dua pemain manusia di tim 0 (masukan ke-2 = inputs[1]), lawan dikendalikan AI */
+    this.coop = !!cfg.coop;
+    if (this.coop) this.humans = [true, false];
+    this.active2 = null;
     this.teams = D.resolveKits(D.sanitizeTeam(cfg.teams && cfg.teams[0]), D.sanitizeTeam(cfg.teams && cfg.teams[1]));
     this.t = 0; this.realT = 0; this.acc = 0;
     this.clock = this.rules.dur;
@@ -42,7 +46,7 @@
     this.players = [];
     this.ball = { x: 0, y: R, z: 0, vx: 0, vy: 0, vz: 0, owner: null, last: null, holdT: 0, petirT: 0, pass: null, noTouch: null, noTouchT: 0, stuckT: 0, inNet: 0 };
     this.inputs = [blankInput(), blankInput()];
-    this.hs = [{ passSeq: 0, gocekSeq: 0, switchSeq: 0, shootSeq: 0, shootHeld: false, skipSeq: 0 }, { passSeq: 0, gocekSeq: 0, switchSeq: 0, shootSeq: 0, shootHeld: false, skipSeq: 0 }];
+    this.hs = [{ passSeq: 0, gocekSeq: 0, switchSeq: 0, shootSeq: 0, shootHeld: false, skipSeq: 0, lobSeq: 0 }, { passSeq: 0, gocekSeq: 0, switchSeq: 0, shootSeq: 0, shootHeld: false, skipSeq: 0, lobSeq: 0 }];
     this.active = [null, null];
     this.swT = [0, 0];
     this.aim = null;
@@ -50,6 +54,7 @@
     this.revealed = [{}, {}];
     this.corners = [0, 0];
     this.golden = false; this.goldenT = 0;
+    this.half = 1; this.swap = false; this.firstKick = 0; /* babak & tukar sisi (Liga Pro) */
     this.pen = null;
     this.shootout = null;
     this.winner = -1;
@@ -78,7 +83,8 @@
   var S = Sim.prototype;
 
   S.blankStats = function () { return { shots: 0, onTarget: 0, goals: 0, saves: 0, special: 0, tackles: 0, passes: 0, best: 0, offsides: 0, fouls: 0 }; };
-  S.dirOf = function (team) { return team === 0 ? 1 : -1; };
+  /* arah serang: tim 0 ke +x di babak 1; Liga Pro bertukar sisi di babak 2 */
+  S.dirOf = function (team) { return (team === 0 ? 1 : -1) * (this.swap ? -1 : 1); };
   S.oppGoalX = function (team) { return this.dirOf(team) * F.L / 2; };
   S.ownGoalX = function (team) { return -this.dirOf(team) * F.L / 2; };
   S.emit = function (e) { e.id = ++this.evId; this.events.push(e); if (this.events.length > 200) this.events.splice(0, 100); };
@@ -170,8 +176,8 @@
     kicker.x = -dir * 0.55; kicker.z = 0; kicker.facing = Math.atan2(dir, 0);
     if (cands[1]) { cands[1].x = -dir * 3.5 * F.ss; cands[1].z = (cands[1].slot.fz >= 0 ? 4 : -4) * F.ss; }
     this.kicker = kicker;
-    if (this.humans[team]) this.active[team] = kicker;
-    if (first) this.emit({ k: 'kickoffFirst' });
+    if (this.humans[team]) { this.active[team] = kicker; if (this.coop && team === 0 && this.active2 === kicker) this.active2 = null; }
+    if (first) { this.firstKick = team; this.emit({ k: 'kickoffFirst' }); }
   };
 
   /* ---------------- update utama ---------------- */
@@ -241,8 +247,10 @@
     if (b.noTouchT > 0) { b.noTouchT -= sdt; if (b.noTouchT <= 0) b.noTouch = null; }
 
     for (var t = 0; t < 2; t++) if (this.humans[t]) this.updateActive(t, sdt);
+    if (this.coop) this.updateActive2();
     this.aiUpdate(sdt);
     for (t = 0; t < 2; t++) if (this.humans[t]) this.humanControl(t, sdt, dt);
+    if (this.coop) this.humanControl(1, sdt, dt, 0);
     if (this.phase !== 'play') return; // aksi pemain bisa memicu sinematik
     this.movePlayers(sdt);
     this.updateBall(sdt);
@@ -338,7 +346,7 @@
       b.vx = (tx - b.x) / Math.max(dt, 1e-3) * 0.6; b.vz = (tz - b.z) / Math.max(dt, 1e-3) * 0.6;
       b.x = U.lerp(b.x, tx, 0.6); b.z = U.lerp(b.z, tz, 0.6); b.y = R; b.vy = 0;
       if (Math.abs(b.x) > F.L / 2 + R * 0.5 && Math.abs(b.z) < F.goalW / 2 - R && this.phase === 'play') {
-        this.freeGoal(b.x > 0 ? 0 : 1);
+        this.freeGoal((b.x > 0) === (this.dirOf(0) > 0) ? 0 : 1);
         return;
       }
       this.checkBounds(dt, true);
@@ -366,7 +374,7 @@
       var dec = this.arena.fric * D.wv(this.weather, 'fric') * dt;
       if (spd <= dec) { b.vx = 0; b.vz = 0; } else { b.vx *= (spd - dec) / spd; b.vz *= (spd - dec) / spd; }
     }
-    if (b.pass) { b.pass.t += dt; if (b.pass.t > 3) b.pass = null; }
+    if (b.pass) { b.pass.t += dt; if (b.pass.t > (b.pass.lob ? 4.5 : 3)) b.pass = null; }
     this.collideGoals(px, py, pz);
     if (this.phase !== 'play') return;
     this.checkBounds(dt, false);
@@ -401,7 +409,7 @@
         var tt = (s * F.L / 2 - px) / ((b.x - px) || 1e-6);
         var cz = pz + (b.z - pz) * U.clamp(tt, 0, 1), cy = py + (b.y - py) * U.clamp(tt, 0, 1);
         if (Math.abs(cz) < F.goalW / 2 - R * 0.5 && cy < F.goalH - R * 0.3) {
-          var scorer = s === 1 ? 0 : 1;
+          var scorer = (s === 1) === (this.dirOf(0) > 0) ? 0 : 1; /* gawang di +x milik lawan tim yang menyerang ke +x */
           this.freeGoal(scorer);
           return;
         }
@@ -505,8 +513,9 @@
     var v = U.clamp(5 + d2 * 0.55, 7, 15);
     this.setFacingTo(p, tx, tz);
     this.kickFree(p, ddx / d2 * v, 2.6 + d2 * 0.06, ddz / d2 * v, best, 'throwin');
+    if (this.ball.pass) this.ball.pass.throwin = 1;
     this.emit({ k: 'pass', p: this.code(p), to: this.code(best), throwin: 1 });
-    if (best && this.humans[p.team]) this.active[p.team] = best;
+    if (best && this.humans[p.team]) this.claimFor(p, best);
   };
 
   S.resetBallFree = function () {
@@ -601,15 +610,16 @@
     var b = this.ball, prev = b.last;
     var fromMatePass = b.pass && b.pass.from && b.pass.from.team === p.team && b.pass.from !== p;
     if (fromMatePass && b.pass.off && b.pass.to === p && this.phase === 'play') { b.pass = null; this.offsideCall(p); return; }
+    var backPass = !!(this.rules.pro && fromMatePass && !b.pass.lob && !b.pass.throwin && b.y < 0.5); /* aturan back-pass: kiper tak boleh menangkap operan kaki rekan */
     b.owner = p; b.vx = b.vy = b.vz = 0; b.pass = null; b.holdT = 0; b.noTouch = null; b.stuckT = 0;
     b.last = p;
-    if (p.role === 'GK' && this.inOwnBox(p, 0.5)) {
+    if (p.role === 'GK' && this.inOwnBox(p, 0.5) && !backPass) {
       p.gkHold = true; p.gkHoldT = 0; p.anim = 'gkHold'; this.holdBallAt(p);
-    } else { b.y = R; }
+    } else { b.y = R; if (p.role === 'GK' && backPass) { this.emit({ k: 'backpass', p: this.code(p), team: p.team }); } }
     if (fromMatePass) { p.recvAt = this.t; p.fromPass = true; this.addSem(p.team, 2); this.stats[p.team].passes++; }
     else { p.fromPass = false; }
     if (!silent && prev && prev.team !== p.team && p.role !== 'GK') this.emit({ k: 'steal', team: p.team });
-    if (this.humans[p.team] && p.role !== 'GK') this.active[p.team] = p;
+    this.claim(p, 0);
     if (this.aim && this.aim.p !== p) { this.aim = null; this.tsTarget = 1; }
   };
 
@@ -628,9 +638,11 @@
   };
 
   /* ---------------- aksi ---------------- */
-  S.pickReceiver = function (p, dx, dz) {
+  /* pilih penerima. aimed=true (operan bertenaga): arah hadap badan menentukan, rekan sejauh apa pun di kerucut hadap bisa dipilih */
+  S.pickReceiver = function (p, dx, dz, aimed) {
     var dl = Math.sqrt(dx * dx + dz * dz);
-    if (dl < 0.2) { var f = this.faceVec(p); dx = f[0]; dz = f[1]; dl = 1; }
+    var f = this.faceVec(p);
+    if (dl < 0.2 || aimed) { dx = f[0]; dz = f[1]; dl = 1; }
     dx /= dl; dz /= dl;
     var best = null, bestS = -1e9, self = this, dir = this.dirOf(p.team);
     this.players.forEach(function (q) {
@@ -638,19 +650,34 @@
       var vx = q.x - p.x, vz = q.z - p.z, d = Math.sqrt(vx * vx + vz * vz);
       if (d < 2) return;
       var cos = (vx * dx + vz * dz) / d;
+      if (aimed && cos < 0.55) return; /* di luar kerucut ±57° hadap badan */
       var open = 8, lane = 4;
       self.players.forEach(function (o) {
         if (o.team === p.team || o.hidden) return;
         open = Math.min(open, U.dist(o.x, o.z, q.x, q.z));
         lane = Math.min(lane, self.segDist(o.x, o.z, p.x, p.z, q.x, q.z));
       });
-      var s = cos * 3 + Math.min(open, 6) * 0.25 + Math.min(lane, 3) * 0.45 - Math.abs(d - 11) * 0.05 + (vx * dir) * 0.03;
+      var s = aimed ? (cos * 8 + Math.min(open, 6) * 0.15 + Math.min(lane, 3) * 0.2)
+        : (cos * 3 + Math.min(open, 6) * 0.25 + Math.min(lane, 3) * 0.45 - Math.abs(d - 11) * 0.05 + (vx * dir) * 0.03);
       if (q.role === 'GK') s -= 3;
       if (cos < -0.1) s -= 2.5;
-      if (self.rules.pro && self.isOffside(p, q)) s -= 4;
+      if (self.rules.pro && self.isOffside(p, q)) s -= (aimed ? 1.5 : 4);
       if (s > bestS) { bestS = s; best = q; }
     });
     return best;
+  };
+  /* rekan terdekat dari titik jatuh bola (untuk operan tanpa penerima jelas) */
+  S.nearestMate = function (p, x, z) {
+    var best = null, bd = 1e9;
+    this.players.forEach(function (q) { if (q.team !== p.team || q === p || q.hidden || q.role === 'GK') return; var d = U.dist(q.x, q.z, x, z); if (d < bd) { bd = d; best = q; } });
+    return bd < 14 ? best : null;
+  };
+  /* titik berhenti bola datar dengan gesekan lapangan */
+  S.stopPoint = function (x, z, vx, vz) {
+    var sp = Math.sqrt(vx * vx + vz * vz), dec = this.arena.fric * D.wv(this.weather, 'fric');
+    if (sp < 0.01 || dec <= 0) return { x: x, z: z };
+    var dist = sp * sp / (2 * dec);
+    return { x: U.clamp(x + vx / sp * dist, -F.L / 2, F.L / 2), z: U.clamp(z + vz / sp * dist, -F.W / 2, F.W / 2) };
   };
 
   S.segDist = function (px, pz, ax, az, bx, bz) {
@@ -690,7 +717,7 @@
     if (card) {
       this.cards.push({ p: this.code(def), card: card, t: this.t });
       this.emit({ k: 'card', p: this.code(def), card: card, team: def.team });
-      if (card === 'merah') { def.hidden = true; def.x = -this.dirOf(def.team) * (F.L / 2 + 6); def.z = F.W / 2 + 5; if (this.active[def.team] === def) this.active[def.team] = this.pl(def.team, 1); }
+      if (card === 'merah') { def.hidden = true; def.x = -this.dirOf(def.team) * (F.L / 2 + 6); def.z = F.W / 2 + 5; if (this.active[def.team] === def) this.active[def.team] = this.pl(def.team, 1); if (this.active2 === def) this.active2 = null; }
     }
     car.stunT = Math.max(car.stunT, 0.4);
     def.stunT = Math.max(def.stunT, 0.5);
@@ -699,31 +726,73 @@
     this.restartWith(car.team, U.clamp(car.x, -F.L / 2 + 1, F.L / 2 - 1), U.clamp(car.z, -F.W / 2 + 1, F.W / 2 - 1), 'freekick');
   };
 
-  S.doPass = function (p, dx, dz) {
+  /* operan datar. pow 0 = ketuk (tenaga otomatis sesuai jarak); pow > 0 = tahan tombol: semakin lama semakin kencang, arah = hadap badan */
+  S.doPass = function (p, dx, dz, pow) {
     if (this.ball.owner !== p) return;
-    var r = this.pickReceiver(p, dx, dz);
+    pow = U.clamp(U.num(pow, 0), 0, 1.2);
+    var aimed = pow > 0;
+    var r = this.pickReceiver(p, dx, dz, aimed);
     var spdMul = D.bv(this.ballDef, 'spd');
+    var f = this.faceVec(p), self = this;
     if (!r) {
-      var f = this.faceVec(p);
-      this.kickFree(p, f[0] * 13 * spdMul, 1, f[1] * 13 * spdMul, null, 'pass');
-      this.emit({ k: 'kick', p: this.code(p), soft: 1 });
+      var v0 = (aimed ? 8 + pow * 20 : 13) * spdMul;
+      this.kickFree(p, f[0] * v0, 1, f[1] * v0, null, 'pass');
+      var sp0 = this.stopPoint(this.ball.x, this.ball.z, this.ball.vx, this.ball.vz);
+      var m0 = this.nearestMate(p, sp0.x, sp0.z);
+      if (m0) { this.ball.pass = { to: m0, from: p, t: 0, tx: sp0.x, tz: sp0.z, loose: 1 }; if (this.isOffside(p, m0)) this.ball.pass.off = true; }
+      this.emit({ k: 'kick', p: this.code(p), soft: 1, pow: Math.round(pow * 100) });
       return;
     }
     var d = U.dist(p.x, p.z, r.x, r.z);
-    var v = U.clamp(7 + d * 0.7, 9, 19 + (F.ss - 1) * 8) * spdMul;
+    var v = aimed ? U.clamp(8 + pow * 20, 8, 32) * spdMul : U.clamp(7 + d * 0.7, 9, 19 + (F.ss - 1) * 8) * spdMul;
     var lead = d / v * 0.75;
     var tx = r.x + r.vx * lead, tz = r.z + r.vz * lead;
-    var lane = 9, self = this;
+    var lane = 9;
     this.players.forEach(function (o) { if (o.team !== p.team && !o.hidden) lane = Math.min(lane, self.segDist(o.x, o.z, p.x, p.z, tx, tz)); });
     var ddx = tx - p.x, ddz = tz - p.z, dd = Math.sqrt(ddx * ddx + ddz * ddz) || 1;
     var vy = 0.4;
-    if (lane < 1.1 && dd > 5) { v *= 0.82; vy = 3.2 + dd * 0.13; }
+    if (!aimed && lane < 1.1 && dd > 5) { v *= 0.82; vy = 3.2 + dd * 0.13; }
     this.setFacingTo(p, tx, tz);
     var off = this.isOffside(p, r);
     this.kickFree(p, ddx / dd * v, vy, ddz / dd * v, r, vy > 2 ? 'shoot' : 'pass');
+    var sp = this.stopPoint(this.ball.x, this.ball.z, this.ball.vx, this.ball.vz);
+    this.ball.pass.tx = sp.x; this.ball.pass.tz = sp.z; this.ball.pass.pow = pow;
     if (off && this.ball.pass) this.ball.pass.off = true;
-    this.emit({ k: 'pass', p: this.code(p), to: this.code(r), lob: vy > 2 ? 1 : 0 });
-    if (this.humans[p.team]) this.active[p.team] = r;
+    this.emit({ k: 'pass', p: this.code(p), to: this.code(r), lob: vy > 2 ? 1 : 0, pow: Math.round(pow * 100) });
+    this.claimFor(p, r);
+  };
+
+  /* operan lambung: bola melayang ke arah hadap badan; tahan tombol = semakin jauh/kencang. penerima dipilih di kerucut hadap */
+  S.doLob = function (p, dx, dz, pow) {
+    if (this.ball.owner !== p) return;
+    pow = U.clamp(U.num(pow, 0.6), 0.2, 1.2);
+    var r = this.pickReceiver(p, dx, dz, true);
+    var spdMul = D.bv(this.ballDef, 'spd');
+    var f = this.faceVec(p);
+    var maxD = 10 + pow * 26 * (0.75 + F.ss * 0.25);
+    var tx, tz;
+    if (r) {
+      var d = U.dist(p.x, p.z, r.x, r.z);
+      /* tenaga menentukan jarak: tenaga pas (~0,7) mendarat di kaki rekan, lebih lama = lewat di depannya */
+      var dist = U.clamp(d * (0.55 + pow * 0.65), 5, Math.max(6, maxD));
+      var lead = 0.9;
+      var ax = (r.x + r.vx * lead) - p.x, az = (r.z + r.vz * lead) - p.z, al = Math.sqrt(ax * ax + az * az) || 1;
+      tx = p.x + ax / al * dist; tz = p.z + az / al * dist;
+    } else { tx = p.x + f[0] * maxD; tz = p.z + f[1] * maxD; }
+    tx = U.clamp(tx, -F.L / 2 + 0.5, F.L / 2 - 0.5); tz = U.clamp(tz, -F.W / 2 + 0.5, F.W / 2 - 0.5);
+    var ddx = tx - p.x, ddz = tz - p.z, dd = Math.sqrt(ddx * ddx + ddz * ddz) || 1;
+    /* lintasan parabola: vy tinggi, kecepatan datar dari jarak & waktu terbang */
+    var vy = U.clamp(5.5 + dd * 0.22, 6, 13);
+    var tf = 2 * vy / 9.8;
+    var vh = dd / tf * 1.08 * spdMul; /* sedikit lebih karena hambatan udara */
+    this.setFacingTo(p, tx, tz);
+    var off = r ? this.isOffside(p, r) : false;
+    this.kickFree(p, ddx / dd * vh, vy, ddz / dd * vh, r, 'shoot');
+    var to = r || this.nearestMate(p, tx, tz);
+    this.ball.pass = { to: to, from: p, t: 0, tx: tx, tz: tz, lob: 1, pow: pow, loose: r ? 0 : 1 };
+    if (off) this.ball.pass.off = true;
+    this.emit({ k: 'pass', p: this.code(p), to: this.code(r), lob: 1, pow: Math.round(pow * 100) });
+    if (to) this.claimFor(p, to);
   };
 
   S.doLongKick = function (p) {
@@ -818,7 +887,7 @@
       var v = far ? U.clamp(10 + d * 0.45, 14, 24) : U.clamp(8 + d * 0.55, 10, 18);
       this.setFacingTo(gk, best.x, best.z);
       this.kickFree(gk, tdx / d * v, far ? 6 + d * 0.06 : 2.2 + d * 0.05, tdz / d * v, best, far ? 'punt' : 'throw');
-      if (this.humans[gk.team]) this.active[gk.team] = best;
+      this.claimFor(gk, best);
     } else {
       this.kickFree(gk, dir * 17, 7, this.rng.range(-4, 4), null, 'punt');
     }
@@ -888,7 +957,7 @@
       id: this.cineId, team: t, si: p.idx, ki: 0, type: p.shot.id, zone: zone.id, c: Math.round(charge * 100), ult: ult ? 1 : 0, combo: combo ? 1 : 0,
       perfect: perfect ? 1 : 0, sp: r.sp, kp: r.kp, res: r.res, skill: r.skill, fx: Math.round(p.x * 100) / 100, fz: Math.round(p.z * 100) / 100,
       pen: opts.pen ? 1 : 0, sandal: (p.cfg.foot === 'sandal' && charge > 0.8 && this.rng() < 0.4) ? 1 : 0, kx: Math.round(keeper.x * 100) / 100, kz: Math.round(keeper.z * 100) / 100,
-      bx: Math.round(b.x * 100) / 100, bz: Math.round(b.z * 100) / 100
+      bx: Math.round(b.x * 100) / 100, bz: Math.round(b.z * 100) / 100, dir: this.dirOf(t)
     };
     b.owner = null; b.pass = null; b.vx = b.vy = b.vz = 0; b.last = p;
     this.phase = 'cine'; this.phaseT = 0; this.cineWait = 0; this.cineDone = false;
@@ -1110,8 +1179,21 @@
       } else {
         this.clock -= sdt;
         if (this.clock <= 0) { this.clock = 0; this.timeUp(); }
+        else if (this.rules.pro && this.half === 1 && this.clock <= this.rules.dur / 2 && this.phase === 'play' && !(this.aim)) this.halfTime();
       }
     }
+  };
+
+  /* turun minum (Liga Pro): tukar sisi, babak 2 dimulai oleh tim yang tidak menendang pertama */
+  S.halfTime = function () {
+    this.half = 2; this.swap = !this.swap;
+    this.cancelAim();
+    var b = this.ball; b.owner = null; b.pass = null;
+    this.players.forEach(function (p) { p.gkHold = false; p.throwIn = false; p.celebrate = false; });
+    this.emit({ k: 'whistle', long: 1 });
+    this.emit({ k: 'half', sc: [this.score[0], this.score[1]] });
+    this.setupKickoff(1 - this.firstKick, false);
+    this.phaseT = -1.2; /* jeda singkat sebelum sepak mula babak 2 */
   };
 
   S.timeUp = function () {
@@ -1385,20 +1467,23 @@
     cur.zc = U.clamp(Math.round(U.num(inp.zc, 0)), -1, 1);
     cur.zr = U.clamp(Math.round(U.num(inp.zr, 1)), 0, 2);
     cur.chase = !!inp.chase;
+    cur.passCharge = U.clamp(U.num(inp.passCharge, 0), 0, 1.25);
+    cur.lobSeq = U.num(inp.lobSeq, cur.lobSeq) | 0;
+    cur.lobCharge = U.clamp(U.num(inp.lobCharge, 0), 0, 1.25);
   };
 
   S.resetInputSeqs = function (team) {
     var inp = this.inputs[team], hs = this.hs[team];
-    hs.passSeq = inp.passSeq; hs.gocekSeq = inp.gocekSeq; hs.switchSeq = inp.switchSeq; hs.shootSeq = inp.shootSeq; hs.skipSeq = inp.skipSeq; hs.shootHeld = inp.shootHeld;
+    hs.passSeq = inp.passSeq; hs.gocekSeq = inp.gocekSeq; hs.switchSeq = inp.switchSeq; hs.shootSeq = inp.shootSeq; hs.skipSeq = inp.skipSeq; hs.shootHeld = inp.shootHeld; hs.lobSeq = inp.lobSeq;
   };
 
   S.updateActive = function (team, dt) {
-    var b = this.ball, cur = this.active[team];
-    if (b.owner && b.owner.team === team && b.owner.role !== 'GK') { this.active[team] = b.owner; this.swT[team] = 0; return; }
-    if (b.pass && b.pass.to && b.pass.to.team === team && b.pass.to.role !== 'GK') { this.active[team] = b.pass.to; return; }
+    var b = this.ball, cur = this.active[team], co = this.coop && team === 0, a2 = this.active2;
+    if (b.owner && b.owner.team === team && b.owner.role !== 'GK') { if (co) { if (b.owner !== a2) this.claim(b.owner, 0); } else this.active[team] = b.owner; this.swT[team] = 0; return; }
+    if (b.pass && b.pass.to && b.pass.to.team === team && b.pass.to.role !== 'GK') { if (co) { if (b.pass.to !== a2) this.claim(b.pass.to, 0); } else this.active[team] = b.pass.to; return; }
     var pred = this.predictBall(0.3), best = null, bd = 1e9;
     this.players.forEach(function (p) {
-      if (p.team !== team || p.role === 'GK' || p.hidden) return;
+      if (p.team !== team || p.role === 'GK' || p.hidden || (co && p === a2)) return;
       var d = U.dist(p.x, p.z, pred.x, pred.z);
       if (d < bd) { bd = d; best = p; }
     });
@@ -1410,9 +1495,53 @@
     }
   };
 
+  /* pemain yang sedang dikendalikan manusia? */
+  S.isCtl = function (p) {
+    if (!p) return false;
+    if (this.humans[p.team] && this.active[p.team] === p) return true;
+    return this.coop && p.team === 0 && this.active2 === p;
+  };
+  /* beri kendali pemain p ke salah satu pengendali tim 0 (co-op: yang pemainnya lebih dekat) */
+  S.claim = function (p, by) {
+    if (!p || p.role === 'GK' || !this.humans[p.team]) return;
+    if (!this.coop || p.team !== 0) { this.active[p.team] = p; return; }
+    if (p === this.active2 || p === this.active[0]) return;
+    var a1 = this.active[0], a2 = this.active2;
+    var toSecond;
+    if (by === 1) toSecond = false; else if (by === 2) toSecond = true;
+    else if (!a2 || a2.hidden) toSecond = false; else if (!a1 || a1.hidden) toSecond = true;
+    else toSecond = U.dist(a2.x, a2.z, p.x, p.z) < U.dist(a1.x, a1.z, p.x, p.z);
+    if (toSecond) this.active2 = p; else this.active[0] = p;
+  };
+  /* operan dari pemain terkendali: penerima ikut pengendali pengoper */
+  S.claimFor = function (from, r) {
+    if (!r || !this.humans[from.team]) return;
+    if (!this.coop || from.team !== 0) { this.active[from.team] = r; return; }
+    if (r.role === 'GK') return;
+    var byCtl = from === this.active2 ? 2 : (from === this.active[0] ? 1 : 0);
+    if (byCtl === 2 && r !== this.active[0]) this.active2 = r;
+    else if (byCtl === 1 && r !== this.active2) this.active[0] = r;
+    else if (!byCtl) this.claim(r, 0);
+  };
+  S.updateActive2 = function () {
+    if (!this.coop) return;
+    var a1 = this.active[0], a2 = this.active2, b = this.ball;
+    if (a2 && !a2.hidden && a2.role !== 'GK' && a2 !== a1) return;
+    var pred = this.predictBall(0.3), best = null, bd = 1e9;
+    this.players.forEach(function (p) { if (p.team !== 0 || p.role === 'GK' || p.hidden || p === a1) return; var d = U.dist(p.x, p.z, pred.x, pred.z); if (d < bd) { bd = d; best = p; } });
+    this.active2 = best;
+    void b;
+  };
+  S.switchActive2 = function () {
+    var a1 = this.active[0], cur = this.active2, pred = this.predictBall(0.3);
+    var list = this.players.filter(function (p) { return p.team === 0 && p.role !== 'GK' && !p.hidden && p !== cur && p !== a1; });
+    list.sort(function (a, b) { return U.dist(a.x, a.z, pred.x, pred.z) - U.dist(b.x, b.z, pred.x, pred.z); });
+    if (list[0]) { this.active2 = list[0]; this.emit({ k: 'switch', team: 0, ctl: 2 }); }
+  };
+
   S.switchActive = function (team) {
-    var cur = this.active[team], pred = this.predictBall(0.3);
-    var list = this.players.filter(function (p) { return p.team === team && p.role !== 'GK' && !p.hidden && p !== cur; });
+    var cur = this.active[team], pred = this.predictBall(0.3), a2 = this.coop && team === 0 ? this.active2 : null;
+    var list = this.players.filter(function (p) { return p.team === team && p.role !== 'GK' && !p.hidden && p !== cur && p !== a2; });
     list.sort(function (a, b) { return U.dist(a.x, a.z, pred.x, pred.z) - U.dist(b.x, b.z, pred.x, pred.z); });
     if (list[0]) { this.active[team] = list[0]; this.swT[team] = 0; this.emit({ k: 'switch', team: team }); }
   };
@@ -1423,19 +1552,22 @@
     return { x: b.x + b.vx * t * 0.8, z: b.z + b.vz * t * 0.8 };
   };
 
-  S.humanControl = function (team, sdt, dt) {
-    var inp = this.inputs[team], hs = this.hs[team], b = this.ball;
-    var passE = inp.passSeq !== hs.passSeq, gocekE = inp.gocekSeq !== hs.gocekSeq, swE = inp.switchSeq !== hs.switchSeq;
+  /* ci = indeks pengendali (masukan), team = tim yang dikendalikan (co-op: pengendali 1 → tim 0, pemain kedua) */
+  S.humanControl = function (ci, sdt, dt, teamOv) {
+    var team = teamOv == null ? ci : teamOv, second = ci !== team;
+    var inp = this.inputs[ci], hs = this.hs[ci], b = this.ball;
+    var passE = inp.passSeq !== hs.passSeq, gocekE = inp.gocekSeq !== hs.gocekSeq, swE = inp.switchSeq !== hs.switchSeq, lobE = inp.lobSeq !== hs.lobSeq;
     var relE = inp.shootSeq !== hs.shootSeq, pressE = inp.shootHeld && !hs.shootHeld;
-    hs.passSeq = inp.passSeq; hs.gocekSeq = inp.gocekSeq; hs.switchSeq = inp.switchSeq; hs.shootSeq = inp.shootSeq; hs.shootHeld = inp.shootHeld; hs.skipSeq = inp.skipSeq;
+    hs.passSeq = inp.passSeq; hs.gocekSeq = inp.gocekSeq; hs.switchSeq = inp.switchSeq; hs.shootSeq = inp.shootSeq; hs.shootHeld = inp.shootHeld; hs.skipSeq = inp.skipSeq; hs.lobSeq = inp.lobSeq;
+    if (lobE && !passE) passE = true, inp._lob = true; else inp._lob = false;
     var gk = this.pl(team, 0);
     if (gk.gkHold && b.owner === gk) {
       if (passE || relE) this.gkDistribute(gk, inp.mx, inp.mz);
     }
-    var p = this.active[team];
+    var p = second ? this.active2 : this.active[team];
     if (!p || p.hidden) return;
     var aiming = this.aim && this.aim.p === p;
-    if (swE && !(b.owner && b.owner.team === team)) { this.switchActive(team); p = this.active[team]; if (!p) return; aiming = false; }
+    if (swE && !(b.owner && b.owner.team === team)) { if (second) { this.switchActive2(); p = this.active2; } else { this.switchActive(team); p = this.active[team]; } if (!p) return; aiming = false; }
     if (p.stunT > 0 || p.slideT > 0) return;
     // gerak
     if (aiming) { p.dvx = 0; p.dvz = 0; }
@@ -1448,7 +1580,7 @@
       p.dvx = 0; p.dvz = 0;
       if (Math.abs(inp.mx) + Math.abs(inp.mz) > 0.3) p.facing = U.angLerp(p.facing, Math.atan2(inp.mx, inp.mz), 0.15);
       p.throwT = (p.throwT || 0) + sdt;
-      if (passE || relE || pressE || gocekE || p.throwT > 5) this.doThrowIn(p, inp.mx, inp.mz);
+      if (passE || relE || pressE || gocekE || p.throwT > 5) this.doThrowIn(p, inp.mx, inp.mz, inp._lob ? 1 : 0);
       return;
     }
     if (b.owner === p) {
@@ -1464,7 +1596,7 @@
         }
         this.doLongKick(p); return;
       }
-      if (passE) { this.doPass(p, inp.mx, inp.mz); return; }
+      if (passE) { if (inp._lob) this.doLob(p, inp.mx, inp.mz, inp.lobCharge); else this.doPass(p, inp.mx, inp.mz, inp.passCharge); return; }
       if (gocekE) {
         var f = this.faceVec(p);
         var lat = -f[1] * inp.mx + f[0] * inp.mz;
@@ -1474,6 +1606,8 @@
     }
     // tanpa bola: ketuk = sliding tackle bila lawan dekat; ditahan lama = mengejar bola otomatis & merebut
     var car = b.owner;
+    // penerima operan yang stiknya diam: otomatis menjemput bola (seperti rekan NPC), stik digerakkan = kendali penuh pemain
+    if (!car && b.pass && b.pass.to === p && Math.abs(inp.mx) + Math.abs(inp.mz) < 0.2 && !aiming) { this.aiReceive(p, sdt); }
     if (gocekE) {
       if (Math.abs(inp.mx) + Math.abs(inp.mz) > 0.2) p.facing = Math.atan2(inp.mx, inp.mz);
       if (!car || U.dist(p.x, p.z, car.x, car.z) < 4.5) this.doTackle(p, true);
@@ -1503,13 +1637,13 @@
     return {
       v: 1, ht: Math.round(this.t * 1000), ph: PHASES.indexOf(this.phase), ts: Math.round(this.timeScale * 100), ck: Math.round(this.clock * 10),
       sc: [this.score[0], this.score[1]], se: [Math.round(this.sem[0]), Math.round(this.sem[1])],
-      ac: [this.active[0] ? this.active[0].idx : -1, this.active[1] ? this.active[1].idx : -1],
+      ac: [this.active[0] ? this.active[0].idx : -1, this.active[1] ? this.active[1].idx : -1], a2: this.active2 ? this.active2.idx : -1,
       b: [Math.round(b.x * 100), Math.round(b.y * 100), Math.round(b.z * 100), this.code(b.owner), b.petirT > 0 ? 1 : 0, Math.round(b.holdT * 10)],
       p: ps, cn: [this.corners[0], this.corners[1]], gg: this.golden ? 1 : 0, am: this.aim ? this.code(this.aim.p) : -1,
       pn: pen ? [PEN_STATES.indexOf(pen.state), pen.team, ['single', 'shootout', 'practice'].indexOf(pen.kind), pen.shooter ? pen.shooter.idx : 0] : 0,
       so: so ? [so.kicks[0].join(''), so.kicks[1].join(''), so.done ? 1 : 0, so.winner] : 0,
       rv: [Object.keys(this.revealed[0]).join(','), Object.keys(this.revealed[1]).join(',')],
-      wn: this.winner, gt: this.goalTeam == null ? -1 : this.goalTeam
+      wn: this.winner, gt: this.goalTeam == null ? -1 : this.goalTeam, hf: this.half, sw: this.swap ? 1 : 0
     };
   };
 })(typeof window !== 'undefined' ? window : globalThis);

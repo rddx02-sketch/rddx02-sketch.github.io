@@ -539,7 +539,7 @@
       for (i = 0; i < n; i++) this.normPS.emit(x + (Math.random() - 0.5) * 0.8, y + (Math.random() - 0.5) * 0.6, z + (Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 2.4, 1 + Math.random() * 2.2, (Math.random() - 0.5) * 2.4, 1 + Math.random() * 0.9, 0.5, 2.4, '#f4f7fa', '#b8c2cc', 0.5, -0.6, 0.96);
     } else if (kind === 'dust') {
       n = Math.round((o.n || 14) * pm);
-      for (i = 0; i < n; i++) { var a3 = Math.random() * U.TAU; this.normPS.emit(x, 0.15, z, Math.cos(a3) * 2.5, 0.4 + Math.random() * 0.8, Math.sin(a3) * 2.5, 0.6 + Math.random() * 0.5, 0.5, 1.4, o.col || '#c9a978', o.col2 || '#9c805a', 0.5, 0.4, 0.94); }
+      for (i = 0; i < n; i++) { var a3 = Math.random() * U.TAU; this.normPS.emit(x, 0.15, z, Math.cos(a3) * 2.5, 0.4 + Math.random() * 0.8, Math.sin(a3) * 2.5, 0.6 + Math.random() * 0.5, 0.5, 1.4, o.col || this.dustCol || '#c9a978', o.col2 || this.dustCol2 || '#9c805a', 0.5, 0.4, 0.94); }
     } else if (kind === 'debris') {
       n = Math.round((o.n || 24) * pm);
       for (i = 0; i < n; i++) { var a6 = Math.random() * U.TAU, s6 = 2 + Math.random() * 5; this.normPS.emit(x + (Math.random() - 0.5), y, z + (Math.random() - 0.5), Math.cos(a6) * s6 * 0.6, 3 + Math.random() * 5, Math.sin(a6) * s6 * 0.6, 0.8 + Math.random() * 0.6, 0.22, 0.16, o.col || '#6e5440', o.col2 || '#3e2e22', 1, 14, 0.99); }

@@ -316,6 +316,12 @@
     }
   };
 
+  /* pemain yang dikendalikan di perangkat ini (co-op tamu: pemain kedua tim 0) */
+  App.ctlPlayer = function (st, m) {
+    if (!st || !st.active) return null;
+    if (m.ctl === 2) return st.active2 || null;
+    return st.active[m.my] || null;
+  };
   App.updateMatch = function (dt, nowMs) {
     var m = App.match, v = m.view, st = m.state;
     Input.setCine(!!(v.cine && v.cine.active));
@@ -354,7 +360,8 @@
     }
     BA.Narr.update(dt, st, App.paused && m.kind === 'local');
     v.minimap(dt, st, m.my, App.settings.minimap);
-    UI.hud(st, m.my, { canShoot: st.active && st.active[m.my] ? st.inShotRange(st.active[m.my]) || st.phase === 'pen' : true });
+    var mePl = App.ctlPlayer(st, m);
+    UI.hud(st, m.my, { me: mePl, canShoot: mePl ? st.inShotRange(mePl) || st.phase === 'pen' : true });
     App.aimUi(st, m);
     v.render();
     // jaga kelancaran
@@ -504,13 +511,15 @@
     return cfg;
   };
   function packCfg(cfg, weather) {
-    return { m: 'match', f: D.fieldById[cfg.field] ? cfg.field : 'kampung', a: cfg.arena, w: weather || pickWeather(cfg.weather), b: cfg.ball, r: { d: cfg.rules.dur, t: cfg.rules.tie, bo: cfg.rules.bound, tp: cfg.rules.tigaPojok ? 1 : 0, bp: cfg.rules.bolaPanas ? 1 : 0, pr: cfg.rules.pro ? 1 : 0 } };
+    var oi = cfg.coop ? (cfg.opp >= 0 && D.TEAMS[cfg.opp] ? cfg.opp : (cfg._oi != null ? cfg._oi : (cfg._oi = Math.floor(Math.random() * D.TEAMS.length)))) : -1;
+    return { m: 'match', f: D.fieldById[cfg.field] ? cfg.field : 'kampung', a: cfg.arena, w: weather || pickWeather(cfg.weather), b: cfg.ball, co: cfg.coop ? 1 : 0, oi: oi, r: { d: cfg.rules.dur, t: cfg.rules.tie, bo: cfg.rules.bound, tp: cfg.rules.tigaPojok ? 1 : 0, bp: cfg.rules.bolaPanas ? 1 : 0, pr: cfg.rules.pro ? 1 : 0 } };
   }
   function unpackCfg(c) {
     c = c || {};
     var r = c.r || {};
     return {
       mode: 'match', field: D.fieldById[c.f] ? c.f : 'kampung', arena: D.arenaById[c.a] ? c.a : 'kampung', weather: D.weatherById[c.w] ? c.w : 'cerah', ball: D.ballById[c.b] ? c.b : 'merah',
+      coop: !!c.co, opp: (c.oi >= 0 && D.TEAMS[c.oi]) ? c.oi : 0,
       rules: D.applyRuleset({ dur: [120, 240, 360].indexOf(r.d) >= 0 ? r.d : 240, tie: ['penalti', 'emas', 'seri'].indexOf(r.t) >= 0 ? r.t : 'penalti', bound: r.bo === 'keluar' ? 'keluar' : 'pantul', tigaPojok: !!r.tp, bolaPanas: !!r.bp, diff: 1, pro: !!r.pr })
     };
   }
@@ -577,11 +586,13 @@
     var cfg = App.onlineCfg(), pc = packCfg(cfg), uc = unpackCfg(pc);
     var seed = (Math.random() * 1e9) | 0;
     o.mid = (Date.now() % 1000000) + 1;
-    var simCfg = { mode: 'match', field: uc.field, teams: [App.myTeam, o.guestTeam], arena: uc.arena, weather: uc.weather, ball: uc.ball, rules: uc.rules, humans: [true, true], seed: seed };
+    var simCfg = uc.coop
+      ? { mode: 'match', field: uc.field, teams: [App.myTeam, U.copy(D.TEAMS[uc.opp])], arena: uc.arena, weather: uc.weather, ball: uc.ball, rules: uc.rules, humans: [true, false], coop: true, seed: seed }
+      : { mode: 'match', field: uc.field, teams: [App.myTeam, o.guestTeam], arena: uc.arena, weather: uc.weather, ball: uc.ball, rules: uc.rules, humans: [true, true], seed: seed };
     var sim = new BA.Sim(simCfg);
     Net.send({ st: 'play', mid: o.mid, c: pc, t: D.packTeam(App.myTeam), e: [], s: sim.snapshot() });
     o.state = 'play';
-    App.beginMatch({ kind: 'host', sim: sim, state: sim, my: 0, simCfg: simCfg, link: new Net.HostLink(sim, o.mid), meta: { label: 'online' } });
+    App.beginMatch({ kind: 'host', sim: sim, state: sim, my: 0, simCfg: simCfg, link: new Net.HostLink(sim, o.mid), meta: { label: uc.coop ? 'co-op' : 'online' } });
   };
   App.hostBackToLobby = function () {
     var o = App.online, gp = Net.other;
@@ -633,10 +644,11 @@
     var o = App.online;
     var cfg = unpackCfg(pres.c);
     var hostTeam = D.unpackTeam(pres.t || o.hostTeamPacked);
-    var rv = new BA.RemoteView({ mode: 'match', field: cfg.field, teams: [hostTeam, App.myTeam], arena: cfg.arena, weather: cfg.weather, ball: cfg.ball, rules: cfg.rules });
+    var rv = new BA.RemoteView({ mode: 'match', field: cfg.field, teams: [hostTeam, cfg.coop ? U.copy(D.TEAMS[cfg.opp]) : App.myTeam], arena: cfg.arena, weather: cfg.weather, ball: cfg.ball, rules: cfg.rules, coop: cfg.coop });
     o.state = 'play'; o.mid = pres.mid; o.guestReady = false;
     Net.send({ rd: 0 });
-    App.beginMatch({ kind: 'guest', rv: rv, state: rv, my: 1, mid: pres.mid, meta: { label: 'online' } });
+    /* co-op: tamu ikut tim tuan rumah (tim 0) dan memegang pemain kedua */
+    App.beginMatch({ kind: 'guest', rv: rv, state: rv, my: cfg.coop ? 0 : 1, ctl: cfg.coop ? 2 : 1, mid: pres.mid, meta: { label: cfg.coop ? 'co-op' : 'online' } });
     if (pres.s) rv.push(pres.s, performance.now());
   };
 
@@ -728,7 +740,7 @@
       if (pres.t) { o.guestTeam = D.unpackTeam(pres.t); }
       o.guestReady = !!pres.rd;
       if (o.state === 'lobby') {
-        if (o.guestTeam) UI.vsBox('hostVs', App.myTeam, o.guestTeam);
+        if (o.guestTeam) { var hc0 = App.onlineCfg(); if (hc0.coop) UI.vsBox('hostVs', App.myTeam, U.copy(D.TEAMS[hc0.opp >= 0 && D.TEAMS[hc0.opp] ? hc0.opp : (hc0._oi || 0)]), true); else UI.vsBox('hostVs', App.myTeam, o.guestTeam); }
         UI.status('hostStatus', o.guestReady ? 'ok' : 'wait', o.guestReady ? (o.guestTeam ? o.guestTeam.name : 'Lawan') + ' siap. Tekan Mulai!' : 'Lawan tersambung. Menunggu dia menekan Saya siap…');
         $('btnHostStart').disabled = !(o.guestReady && o.guestTeam);
       }
@@ -749,7 +761,7 @@
         return;
       }
       if (o.state === 'lobby' || o.state === 'joining') {
-        if (o.hostTeam) { UI.vsBox('guestVs', o.hostTeam, App.myTeam); }
+        if (o.hostTeam) { if (o.hostCfg && o.hostCfg.coop) UI.vsBox('guestVs', o.hostTeam, U.copy(D.TEAMS[o.hostCfg.opp]), true); else UI.vsBox('guestVs', o.hostTeam, App.myTeam); }
         $('guestReady').classList.remove('hidden');
         $('guestCfgSummary').textContent = o.hostCfg ? 'Aturan dari tuan rumah: ' + UI.cfgSummary(o.hostCfg) : '';
         if (!o.guestReady) UI.status('guestStatus', 'ok', 'Tersambung dengan tuan rumah. Tekan Saya siap.');
@@ -806,7 +818,7 @@
     BA.Narr.onVoices = function () { if (UI.cur === 'scrSettings') UI.openSettings(true); };
     Input.init({
       joyZone: $('joyZone'), joyBase: $('joyBase'), joyKnob: $('joyKnob'),
-      shoot: $('bShoot'), pass: $('bPass'), gocek: $('bGocek'), sw: $('bSwitch'), sprint: $('bSprint'), skip: $('cine')
+      shoot: $('bShoot'), pass: $('bPass'), lob: $('bLob'), gocek: $('bGocek'), sw: $('bSwitch'), sprint: $('bSprint'), skip: $('cine')
     });
     App.defaultDevice = Input.device;
     BA.Layout.init();
