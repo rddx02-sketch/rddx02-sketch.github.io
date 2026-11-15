@@ -147,6 +147,7 @@
         fx.shockRing(from.x, 0.12, from.z, this.shot.fire[1]);
         fx.burst(from.x, 0.1, from.z, 'dust', { n: 14 });
         fx.burst(from.x, 0.15, from.z, 'debris', { n: 16 });
+        if (fx.kickFx) fx.kickFx(from.x, 0.2, from.z, tgt.x - from.x, tgt.z - from.z, 1.2, 'jurus');
         fx.scorch(from.x, from.z, this.shot.fire[1], ult ? 2.2 : 1.6, 7);
         fx.emberRain(from.x, 1.2, from.z, this.shot.fire[1], 30, 2.2);
         if (fx.cineLight) { fx.cineLight.position.set(from.x, 1.2, from.z); fx.cineLight.color.set(this.shot.fire[1]); fx.cineLight.intensity = 5; }
@@ -270,6 +271,7 @@
       fx.emberRain(hp.x, hp.y + 0.3, hp.z, this.shot.fire[1], 24, 2);
       if (fx.impactFx) fx.impactFx(hp.x, hp.y, hp.z, c.res === 'catch' ? 2.6 : 3.6, this.skill ? this.skill.col : '#dff4ff', '#ffffff');
       if (fx.flip && c.res !== 'catch') fx.flip('bolt', hp.x, hp.y, hp.z, { size: 3.6, c0: this.shot.fire[0], c1: this.shot.fire[1], fps: 30 });
+      if (fx.keeperFx) fx.keeperFx(hp.x, hp.y, hp.z, -dir, c.res === 'catch' ? 'catch' : 'parry', 1.15, this.skill ? this.skill.col : null);
       if (c.res === 'catch') {
         fx.burst(hp.x, hp.y, hp.z, 'smoke', { n: 18 });
         if (this.skillFx && this.skillFx.hold) this.skillFx.hold(); else fx.burst(hp.x, hp.y, hp.z, 'steam', { n: 26 });

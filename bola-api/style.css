@@ -204,21 +204,33 @@ body.fsOn .fsBtn { opacity: 0.55; }
 #joyKnob { position: absolute; left: 34px; top: 34px; width: 60px; height: 60px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #fff, #ffd8a8 45%, #ff8a3a); box-shadow: 0 0 18px rgba(255,138,58,0.6); }
 .joyHint { position: absolute; left: 6%; bottom: calc(env(safe-area-inset-bottom, 0px) + 40px); font-size: 12px; color: var(--muted); pointer-events: none; opacity: 0.8; }
 .pad { position: absolute; right: max(8px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 6px); width: 262px; height: 240px; pointer-events: none; }
-.pbtn { position: absolute; border-radius: 50%; border: 3px solid rgba(255,255,255,0.35); background: rgba(20,10,24,0.6); display: grid; place-items: center; text-align: center; font-family: var(--f-display); font-size: 12px; pointer-events: auto; touch-action: none; cursor: pointer; color: var(--chalk); }
+.pbtn { position: absolute; border-radius: 50%; border: 3px solid rgba(255,255,255,0.35); background: rgba(20,10,24,0.6); display: grid; place-items: center; align-content: center; text-align: center; font-family: var(--f-display); font-size: 12px; pointer-events: auto; touch-action: none; cursor: pointer; color: var(--chalk); }
 .pbtn.on { transform: scale(0.92); background: rgba(255,106,26,0.45); }
 /* gugus tombol: tiga tombol utama besar (TENDANG, OPER, GOCEK/REBUT) di busur dalam; tendangan jauh & cungkil di atas TENDANG;
    umpan lambung di kiri OPER; LARI & GANTI di busur luar. Warna per kelompok: tembakan jingga, umpan biru, rebut ungu, lari hijau */
-#bShoot { right: 8px; bottom: 10px; width: 96px; height: 96px; font-size: 15px; border-color: var(--flame); background: radial-gradient(circle at 50% 40%, rgba(255,194,61,0.55), rgba(229,51,42,0.55)); box-shadow: 0 0 24px rgba(255,106,26,0.45); }
-#bLong { right: 10px; bottom: 116px; width: 62px; height: 62px; font-size: 11px; border-color: #ff9f43; background: radial-gradient(circle at 50% 40%, rgba(255,159,67,0.4), rgba(20,10,24,0.6)); }
-#bChip { right: 70px; bottom: 176px; width: 56px; height: 56px; font-size: 9px; border-color: #ffd23f; background: radial-gradient(circle at 50% 40%, rgba(255,210,63,0.32), rgba(20,10,24,0.6)); }
-#bPass { right: 112px; bottom: 4px; width: 76px; height: 76px; border-color: #4cc9f0; }
-#bLob { right: 196px; bottom: 6px; width: 58px; height: 58px; font-size: 9px; border-color: #7cc7ff; }
-#bGocek { right: 96px; bottom: 96px; width: 70px; height: 70px; border-color: var(--aura); }
-#bSprint { right: 176px; bottom: 84px; width: 58px; height: 58px; font-size: 11px; border-color: #3ddc84; }
-#bSwitch { right: 150px; bottom: 160px; width: 52px; height: 52px; font-size: 10px; }
+/* tata letak ala stik PS4: ✕ ○ □ △ membentuk wajik, R2 jurus di atasnya, L1/L2/R1 di sebelah kiri */
+#bLong { right: 8px; bottom: 80px; }
+#bPass { right: 70px; bottom: 18px; }
+#bLob { right: 132px; bottom: 80px; }
+#bChip { right: 70px; bottom: 142px; }
+#bShoot { right: 4px; bottom: 156px; width: 64px; height: 64px; border-color: var(--flame); background: radial-gradient(circle at 50% 40%, rgba(255,194,61,0.55), rgba(229,51,42,0.55)); box-shadow: 0 0 20px rgba(255,106,26,0.45); }
+#bGocek { right: 210px; bottom: 88px; width: 56px; height: 56px; border-color: var(--aura); }
+#bSprint { right: 198px; bottom: 26px; width: 58px; height: 58px; border-color: #3ddc84; }
+#bSwitch { right: 197px; bottom: 148px; width: 52px; height: 52px; }
+.pbtn .sym { display: block; font-style: normal; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-weight: 700; font-size: 11px; line-height: 1; opacity: 0.85; }
+.pbtn b { display: block; font-weight: inherit; font-size: 10px; line-height: 1.05; margin-top: 1px; }
+.pbtn > span { display: grid; place-items: center; }
+.pbtn.ps { width: 60px; height: 60px; background: radial-gradient(circle at 50% 35%, rgba(255,255,255,0.18), rgba(14,10,22,0.72) 70%); }
+.pbtn.ps .sym { font-size: 29px; font-weight: 400; opacity: 1; margin-top: -2px; }
+.pbtn.ps b { font-size: 8.5px; letter-spacing: 0.02em; }
+.ps-x { border-color: #6aa9ff; } .ps-x .sym { color: #8cbcff; }
+.ps-o { border-color: #ff5a67; } .ps-o .sym { color: #ff7a85; }
+.ps-s { border-color: #ff8ad8; } .ps-s .sym { color: #ffa3e1; }
+.ps-t { border-color: #3fdca0; } .ps-t .sym { color: #5ef0b6; }
+.pbtn.ps.charging { background: conic-gradient(var(--flame) calc(var(--ch, 0) * 1turn), rgba(14,10,22,0.72) 0); }
 .pbtn.dim { opacity: 0.42; }
 /* tata tombol ringkas: hanya TENDANG, OPER, GOCEK/REBUT, LARI, GANTI */
-#controls.simple #bLong, #controls.simple #bChip, #controls.simple #bLob { display: none; }
+#controls.simple #bChip, #controls.simple #bGocek { display: none; }
 /* cincin tenaga saat tombol oper/lambung ditahan */
 .pbtn.charging { background: conic-gradient(var(--flame) calc(var(--ch, 0) * 1turn), rgba(20,10,24,0.6) 0); box-shadow: 0 0 18px rgba(255,106,26,0.5); }
 .pbtn.charging.full { background: conic-gradient(#fff 1turn, #fff 0); color: #170e1b; }

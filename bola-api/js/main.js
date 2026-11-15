@@ -1025,6 +1025,8 @@
     if (!ok) { UI.loading('Perangkat ini tidak mendukung WebGL untuk grafis 3D.', true); return; }
     R3.onLost = function () { UI.loading('Memulihkan grafis…', true); };
     R3.onRestored = function () { UI.loading('', false); };
+    /* tata tombol stik ala PS4 (✕ oper, ○ tendang, □ lambung, △ cungkil, R2 jurus): simpanan lama dikembalikan ke bawaan baru sekali saja */
+    if (App.settings.padV !== 2) { App.settings.pad = null; App.settings.padV = 2; U.store.set('settings', App.settings); }
     Input.setBindings(App.settings.keys, App.settings.pad);
     Input.rumbleOn = !!App.settings.vibrate;
     Input.deadzone = App.settings.deadzone;

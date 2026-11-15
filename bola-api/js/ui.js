@@ -592,10 +592,10 @@
     else if (!UI.fsSupported()) sc.appendChild(el('p', 'hint warn', (UI.FS.ua().ios || UI.FS.ua().ipad) ? 'iPhone/iPad: buka game di tab sendiri lalu "Tambah ke Layar Utama" agar tampil penuh tanpa bilah alamat.' : 'Layar penuh tidak diizinkan di jendela ini. Buka game di tab sendiri (tombol ⛶ di pojok menjelaskan caranya) atau tekan F11 di PC.'));
     var he = el('h3', null, 'Mode kontrol'); he.style.marginTop = '6px'; sc.appendChild(he);
     chipRow(sc, [{ id: 1, n: 'Mudah' }, { id: 0, n: 'Mahir' }], S.easy ? 1 : 0, function (v) { App.setSetting('easy', Number(v) === 1); UI.openSettings(true); });
-    sc.appendChild(el('p', 'hint', S.easy ? 'Mudah: cukup ketuk tombol. Tenaga tendangan dan arah gawang dipilih otomatis; menahan tombol tetap bisa untuk mengatur tenaga sendiri.' : 'Mahir: tahan tombol untuk mengisi tenaga dan arahkan sendiri sasaran di gawang. Ketukan singkat menghasilkan tendangan lemah.'));
+    sc.appendChild(el('p', 'hint', S.easy ? 'Mudah: tendangan jurus (R2) membidik gawang sendiri. Semua tombol ✕ ○ □ △ seperti stik PS4: makin lama ditahan sebelum dilepas, makin kuat.' : 'Mahir: tendangan jurus dibidik sendiri dengan joystick. Semua tombol ✕ ○ □ △ seperti stik PS4: makin lama ditahan sebelum dilepas, makin kuat.'));
     var hps = el('h3', null, 'Jumlah tombol aksi'); hps.style.marginTop = '6px'; sc.appendChild(hps);
-    chipRow(sc, [{ id: 'full', n: 'Lengkap (8 tombol)' }, { id: 'simple', n: 'Ringkas (5 tombol)' }], S.padSet, function (v) { App.setSetting('padSet', v); UI.openSettings(true); });
-    sc.appendChild(el('p', 'hint', S.padSet === 'simple' ? 'Ringkas: TENDANG, OPER, GOCEK/REBUT, LARI, GANTI. Tendangan jauh, cungkil, dan umpan lambung disembunyikan.' : 'Lengkap: TENDANG (jurus), JAUH, CUNGKIL, OPER, LAMBUNG, GOCEK/REBUT, LARI, GANTI.'));
+    chipRow(sc, [{ id: 'full', n: 'Lengkap (8 tombol)' }, { id: 'simple', n: 'Ringkas (6 tombol)' }], S.padSet, function (v) { App.setSetting('padSet', v); UI.openSettings(true); });
+    sc.appendChild(el('p', 'hint', S.padSet === 'simple' ? 'Ringkas: ✕ oper, ○ tendang/rebut, □ lambung/sapu, JURUS, LARI, GANTI. △ cungkil dan GOCEK disembunyikan.' : 'Lengkap ala stik PS4: ✕ oper, ○ tendang/rebut, □ lambung/sapu, △ cungkil, R2 jurus, L2 gocek/kejar, R1 lari, L1 ganti.'));
     toggle(sc, 'Tampilkan kondisi pemain (bugar / lelah / lemah / cedera) saat bermain', S.fitHud, function (v) { App.setSetting('fitHud', v); });
     var hk = el('h3', null, 'Tombol di layar'); hk.style.marginTop = '6px'; sc.appendChild(hk);
     chipRow(sc, [{ id: 'auto', n: 'Otomatis' }, { id: 'on', n: 'Selalu tampil' }, { id: 'off', n: 'Sembunyikan' }], S.touchUi, function (v) { App.setSetting('touchUi', v); });
@@ -769,7 +769,7 @@
     if (box._k === key) return;
     box._k = key; clear(box);
     if (dev !== 'kb' && dev !== 'pad') return;
-    [['pass', 'Oper datar'], ['lob', 'Umpan lambung'], ['shoot', 'Tendang jurus'], ['long', 'Tendangan jauh'], ['chip', 'Cungkil'], ['gocek', 'Gocek / rebut'], ['switch', 'Ganti'], ['sprint', 'Lari'], ['skip', 'Lewati']].forEach(function (r) {
+    [['pass', 'Oper datar'], ['long', 'Tendang / rebut'], ['lob', 'Lambung / sapu'], ['chip', 'Cungkil'], ['shoot', 'Jurus'], ['gocek', 'Gocek / kejar'], ['switch', 'Ganti'], ['sprint', 'Lari'], ['skip', 'Lewati']].forEach(function (r) {
       var v = dev === 'kb' ? In.keys[r[0]][0] || In.keys[r[0]][1] : (In.pad[r[0]][0] >= 0 ? In.pad[r[0]][0] : In.pad[r[0]][1]);
       var nm = dev === 'kb' ? In.keyName(v) : In.padName(v);
       if (!v && v !== 0 || nm === '—') return;
@@ -918,14 +918,18 @@
     } else tl.classList.add('hidden');
     // label tombol konteks
     var hasBall = me && st.ball && st.ball.owner === me;
-    setText('bGocek', hasBall || (st.pen && st.pen.team === my) ? 'GOCEK' : 'REBUT');
-    setText('bShoot', opts.canShoot === false ? 'SAPU' : 'TENDANG');
+    /* label tombol mengikuti keadaan, seperti stik PS4: menyerang (pegang bola) atau bertahan */
+    var oppHas = !!(st.ball && st.ball.owner && st.ball.owner.team !== my);
+    setText('bGocekT', hasBall ? 'GOCEK' : 'KEJAR');
+    setText('bShootT', 'JURUS');
+    setText('bLongT', hasBall ? 'TENDANG' : 'REBUT');
+    setText('bLobT', hasBall ? 'LAMBUNG' : 'SAPU');
     var penNow = st.phase === 'pen' || st.mode === 'penalty' || st.mode === 'practice';
     setClass('controls', 'penMode', st.phase === 'pen' || st.mode === 'penalty');
     setClass('bShoot', 'off', penNow && !!st.pen && st.pen.team !== my);
     /* tombol yang hanya berguna saat memegang bola diredupkan ketika bola tidak di kaki */
     var gkMine = !!(st.ball && st.ball.owner && st.ball.owner.team === my && st.ball.owner.gkHold);
-    setClass('bLong', 'dim', !hasBall); setClass('bChip', 'dim', !hasBall); setClass('bLob', 'dim', !hasBall);
+    setClass('bLong', 'dim', !hasBall && !oppHas && !gkMine); setClass('bChip', 'dim', !hasBall); setClass('bLob', 'dim', !hasBall && !oppHas && !gkMine);
     setClass('bPass', 'dim', !hasBall && !gkMine); setClass('bShoot', 'dim', !hasBall && !gkMine && !penNow);
     // cincin tenaga tombol oper / lambung / jauh / cungkil
     var In = BA.Input;

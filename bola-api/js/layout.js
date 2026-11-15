@@ -6,7 +6,7 @@
   var L = BA.Layout = {};
   var IDS = ['bShoot', 'bLong', 'bChip', 'bPass', 'bLob', 'bGocek', 'bSwitch', 'bSprint', 'joyZone'];
   var NEW_IDS = { bLob: 1, bLong: 1, bChip: 1 }; /* tombol yang ditambahkan belakangan: tata letak lama tetap dipakai, tombol baru di posisi bawaan */
-  var NAMES = { bShoot: 'Tendang', bLong: 'Tendangan jauh', bChip: 'Cungkil', bPass: 'Oper', bLob: 'Lambung', bGocek: 'Gocek', bSwitch: 'Ganti', bSprint: 'Lari', joyZone: 'Area joystick' };
+  var NAMES = { bShoot: 'Jurus (R2)', bLong: 'Tombol ○', bChip: 'Tombol △', bPass: 'Tombol ✕', bLob: 'Tombol □', bGocek: 'Gocek (L2)', bSwitch: 'Ganti (L1)', bSprint: 'Lari (R1)', joyZone: 'Area joystick' };
   var JOY_W = 0.46, JOY_H = 0.68; // ukuran bawaan area joystick (bagian layar)
   L.IDS = IDS;
   L.editing = false;
@@ -105,7 +105,7 @@
     return capture(ov) || defaultMap();
   };
   function defaultMap() {
-    return { bShoot: { x: 0.9, y: 0.82, s: 1 }, bLong: { x: 0.93, y: 0.56, s: 1 }, bChip: { x: 0.86, y: 0.4, s: 1 }, bPass: { x: 0.76, y: 0.88, s: 1 }, bLob: { x: 0.64, y: 0.9, s: 1 }, bGocek: { x: 0.79, y: 0.64, s: 1 }, bSwitch: { x: 0.72, y: 0.46, s: 1 }, bSprint: { x: 0.66, y: 0.7, s: 1 }, joyZone: { x: 0.23, y: 0.66, s: 1 } };
+    return { bShoot: { x: 0.957, y: 0.518, s: 1 }, bLong: { x: 0.955, y: 0.718, s: 1 }, bChip: { x: 0.881, y: 0.559, s: 1 }, bPass: { x: 0.881, y: 0.877, s: 1 }, bLob: { x: 0.808, y: 0.718, s: 1 }, bGocek: { x: 0.718, y: 0.703, s: 1 }, bSwitch: { x: 0.736, y: 0.554, s: 1 }, bSprint: { x: 0.731, y: 0.859, s: 1 }, joyZone: { x: 0.23, y: 0.66, s: 1 } };
   }
 
   L.select = function (id) {

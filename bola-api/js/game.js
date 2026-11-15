@@ -20,6 +20,7 @@
     });
     this.fx = new BA.FX(this.scene, st.ballDef);
     if (st.weather.snowGround) { this.fx.dustCol = '#f4f7fa'; this.fx.dustCol2 = '#c8d2dc'; } /* debu lari jadi serbuk salju */
+    if (this.fx.setTurf && this.arena) this.fx.setTurf(st.weather.snowGround ? { a: '#f4f7fa', worn: '#c8d2dc' } : this.arena.surf);
     this.fx.prewarm();
     if (BA.FXTex) BA.FXTex.preloadFor(st);
     this.rig = new BA.CamRig(R3.camera);
@@ -251,11 +252,22 @@
       var kv = function (idx) { var pl = idx >= 0 ? st.players[idx] : null; var tm = pl ? st.teams[pl.team] : null; return tm ? [tm.kind || 'manusia', pl.cfg && pl.cfg.variant || ''] : null; };
       var tv = function (team) { var tm = st.teams[team]; var pl = tm && st.players.filter(function (q) { return q.team === team; })[0]; return tm ? [tm.kind || 'manusia', pl && pl.cfg && pl.cfg.variant || ''] : null; };
       var say = function (kk, ev) { if (kk && A.voice) A.voice(kk[0], kk[1], ev); };
+      /* efek sentuhan kaki ke bola: di posisi bola, ke arah lajunya (atau arah hadap penendang) */
+      var kickVis = function (pow, kind) {
+        if (!v.fx.kickFx || v.cine.active) return;
+        var b = st.ball, kp = e.p >= 0 ? st.players[e.p] : null;
+        if (!b) return;
+        var dx = U.num(b.vx, 0), dz = U.num(b.vz, 0);
+        if (Math.abs(dx) + Math.abs(dz) < 0.5 && kp) { dx = Math.sin(kp.facing || 0); dz = Math.cos(kp.facing || 0); }
+        var bx = U.num(b.x, kp ? kp.x : 0), bz = U.num(b.z, kp ? kp.z : 0);
+        if (kp && Math.hypot(bx - kp.x, bz - kp.z) > 1.4) { bx = kp.x + Math.sin(kp.facing || 0) * 0.45; bz = kp.z + Math.cos(kp.facing || 0) * 0.45; }
+        v.fx.kickFx(bx, Math.min(0.5, U.num(b.y, 0.15)), bz, dx, dz, pow, kind);
+      };
       switch (e.k) {
         case 'kickoffFirst': A.crowdLevel(0.06); A.cheer(1.2); break;
         case 'whistle': A.whistle(!!e.short); break;
-        case 'kick': A.kick(e.soft ? 0.6 : 1); if (!e.soft) say(kv(e.p), 'kick'); break;
-        case 'pass': A.pass(e.pow, e.lob); break;
+        case 'kick': A.kick(e.soft ? 0.6 : 1); if (!e.soft) say(kv(e.p), 'kick'); kickVis(e.soft ? (e.pow || 50) / 100 : 0.95, e.soft ? 'pass' : 'jauh'); break;
+        case 'pass': A.pass(e.pow, e.lob); if (!e.throwin) kickVis((e.pow || 45) / 100, e.lob ? 'lob' : 'pass'); break;
         case 'bounce': A.bounce(e.v); break;
         case 'wall': A.bounce(0.6); break;
         case 'tackle':
@@ -292,13 +304,18 @@
           break;
         case 'save':
           if (!v.cine.active) { if (e.kind === 'smother' || e.kind === 'catch') A.catchBall(); else A.parry(); }
-          if (e.sk && v.fx.impactFx) { v.fx.impactFx(st.ball.x, Math.max(0.5, st.ball.y), st.ball.z, 2.6, '#bfe9ff', '#ffffff'); v.rig.kick(0.2); }
+          if (!v.cine.active && v.fx.keeperFx) {
+            var sx = e.x != null ? e.x : st.ball.x, sy = e.y != null ? e.y : Math.max(0.6, st.ball.y), sz = e.z != null ? e.z : st.ball.z;
+            v.fx.keeperFx(sx, sy, sz, sx > 0 ? -1 : 1, e.kind, (e.pw || 75) / 100);
+            v.rig.kick(e.kind === 'catch' || e.kind === 'smother' ? 0.12 : 0.22);
+          }
           say(tv(e.team), 'save'); break;
         case 'strike': {
           var kp = st.players[e.p];
           A.kick(e.kind === 'jauh' ? 1.3 : 0.8);
           if (e.kind === 'jauh') { say(kv(e.p), 'kick'); v.rig.kick(0.22); }
           if (kp && v.fx.strikeFx) v.fx.strikeFx(kp.x + Math.sin(kp.facing) * 0.5, kp.z + Math.cos(kp.facing) * 0.5, e.kind, fire[0], fire[1]);
+          kickVis(e.kind === 'jauh' ? 1.05 : 0.7, e.kind);
           if (mine(e.p)) vib(20);
           break;
         }

@@ -193,7 +193,8 @@
     var relE = inp.shootSeq !== hs.shootSeq, pressE = inp.shootHeld && !hs.shootHeld;
     hs.passSeq = inp.passSeq; hs.gocekSeq = inp.gocekSeq; hs.switchSeq = inp.switchSeq; hs.shootSeq = inp.shootSeq; hs.shootHeld = inp.shootHeld; hs.skipSeq = inp.skipSeq; hs.lobSeq = inp.lobSeq;
     hs.longSeq = inp.longSeq; hs.chipSeq = inp.chipSeq;
-    var lob = false;
+    var lob = false, lobRaw = lobE;
+    if (!inp.chase) hs.noChase = false;
     if (lobE && !passE) { passE = true; lob = true; }
     inp._lob = lob;
     var gk = this.pl(team, 0);
@@ -221,7 +222,7 @@
       return;
     }
     if (b.owner === p) {
-      if (longE) { this.doStrike(p, 'jauh', inp.longCharge, inp.mx, inp.mz); return; }
+      if (longE) { hs.noChase = true; this.doStrike(p, 'jauh', inp.longCharge, inp.mx, inp.mz); return; }
       if (chipE) { this.doStrike(p, 'cungkil', inp.chipCharge, inp.mx, inp.mz); return; }
       if (aiming) {
         if (relE) { this.shootBy(p, inp); return; }
@@ -247,11 +248,14 @@
     var car = b.owner;
     // penerima operan yang stiknya diam: otomatis menjemput bola (seperti rekan NPC), stik digerakkan = kendali penuh pemain
     if (!car && b.pass && b.pass.to === p && Math.abs(inp.mx) + Math.abs(inp.mz) < 0.2 && !aiming) { this.aiReceive(p, sdt); }
-    if (gocekE) {
+    var oppCar = car && car.team !== team;
+    /* □ tanpa bola = sapu (sliding tackle); ○ tanpa bola = rebut berdiri (ditahan = kejar bola) */
+    if (gocekE || (lobRaw && !(car && car.team === team))) {
       if (Math.abs(inp.mx) + Math.abs(inp.mz) > 0.2) p.facing = Math.atan2(inp.mx, inp.mz);
       if (!car || U.dist(p.x, p.z, car.x, car.z) < 4.5) this.doTackle(p, true);
     }
-    if (inp.chase && !(car && car.team === team) && !aiming) {
+    if (longE && oppCar && !hs.noChase && p.tackleCD <= 0 && U.dist(p.x, p.z, car.x, car.z) < 2.2) this.doTackle(p, false);
+    if (inp.chase && !hs.noChase && !(car && car.team === team) && !aiming) {
       var lead = car ? 0.25 : 0.45;
       var tx = b.x + b.vx * lead, tz = b.z + b.vz * lead;
       if (car) { tx = car.x + car.vx * 0.3; tz = car.z + car.vz * 0.3; }
@@ -417,6 +421,8 @@
 
   S.finishSave = function (sh) {
     var b = this.ball, dir = this.dirOf(sh.team), def = 1 - sh.team, keeper = this.pl(def, 0);
+    /* titik bola mengenai sarung tangan & kerasnya tendangan, untuk efek tangkapan di layar */
+    var ex = Math.round(b.x * 100) / 100, ey = Math.round(Math.max(0.3, b.y) * 100) / 100, ez = Math.round(b.z * 100) / 100, pw = Math.round(U.clamp(U.num(sh.v, 18) / 28, 0.3, 1.3) * 100);
     b.shot = null;
     if (!keeper || keeper.hidden) { this.goalSk = sh.kind; b.x = sh.tx; b.z = sh.tz; this.scoreGoal(sh.team, sh.p, null, true, false); return; }
     keeper.x = U.lerp(keeper.x, b.x + dir * 0.25, 0.85); keeper.z = U.lerp(keeper.z, b.z, 0.85); keeper.vx = keeper.vz = 0;
@@ -428,12 +434,12 @@
       b.last = keeper; b.x = keeper.x; b.z = keeper.z;
       this.givePossession(keeper, true);
       keeper.gkHoldT = -0.3;
-      this.emit({ k: 'save', kind: 'catch', team: def, sk: sh.kind });
+      this.emit({ k: 'save', kind: 'catch', team: def, sk: sh.kind, x: ex, y: ey, z: ez, pw: pw });
       return;
     }
     keeper.stunT = Math.max(keeper.stunT, 0.4);
     if (this.rules.bound === 'keluar' && this.rng() < 0.35) {
-      this.emit({ k: 'save', kind: 'parry', team: def, sk: sh.kind, out: 1 });
+      this.emit({ k: 'save', kind: 'parry', team: def, sk: sh.kind, x: ex, y: ey, z: ez, pw: pw, out: 1 });
       this.awardCorner(sh.team, dir, b.z >= 0 ? 1 : -1);
       return;
     }
@@ -441,7 +447,7 @@
     b.vx = -dir * this.rng.range(4, 8); b.vz = (b.z >= 0 ? 1 : -1) * this.rng.range(2, 6) * (this.rng() < 0.3 ? -1 : 1); b.vy = this.rng.range(2, 4.5);
     b.y = Math.max(b.y, 0.5);
     b.noTouch = keeper; b.noTouchT = 0.45;
-    this.emit({ k: 'save', kind: 'parry', team: def, sk: sh.kind });
+    this.emit({ k: 'save', kind: 'parry', team: def, sk: sh.kind, x: ex, y: ey, z: ez, pw: pw });
   };
 
   /* kiper menghadapi tendangan fisik: mengejar titik tangkap (diselamatkan) atau bereaksi terlambat (gol/meleset) */

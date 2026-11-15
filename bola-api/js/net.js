@@ -66,6 +66,8 @@
   function peerSet(id, role, pres, partial) {
     if (!id || !wanted(role)) return null;
     var p = Net.peers[id], isNew = !p;
+    /* kabar pamit: peserta sengaja keluar — langsung dianggap pergi (tanpa menunggu sambungan putus) */
+    if (pres && pres.st === 'bye') { if (p) { p.pres = pres; peerDrop(id); } return null; }
     if (isNew) {
       if (partial) return null; /* kiriman cepat dari peserta yang belum dikenal: tunggu kabar lengkapnya */
       if (Net.role === 'host' && Object.keys(Net.peers).length >= Net.MAX_GUESTS) return null;

@@ -172,6 +172,133 @@
     this.flip('bolt', x, 1.6, z, { size: 6.5, c0: '#8fb8ff', c1: '#ffffff', fps: 26 });
     this.flip('shock', x, 0.06, z, { size: 8, c0: '#8fb8ff', c1: '#ffffff', flat: true, fps: 28 });
   };
+  /* ======================================================================
+     EFEK FISIK REALISTIS: sentuhan kaki ke bola, jejak udara bola keras, dan tangkapan / tepisan kiper
+     ====================================================================== */
+  /* cincin tekanan udara tipis yang mengembang tegak lurus arah tendangan (atau arah datangnya bola) */
+  function airRing(fx, x, y, z, nx, nz, size, life, col, op) {
+    var g = new THREE.RingGeometry(0.42, 0.5, 40);
+    var mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(col || '#ffffff'), transparent: true, opacity: op || 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
+    var m = new THREE.Mesh(g, mat);
+    m.position.set(x, y, z); m.renderOrder = 7; m.frustumCulled = false;
+    m.rotation.y = Math.atan2(nx, nz);
+    var e = { group: m, life: life || 0.32 };
+    e.update = function (dt, t) {
+      var k = t / e.life, s = size * (0.25 + U.easeOut(Math.min(1, k)) * 1.0);
+      m.scale.set(s, s, 1);
+      m.position.x = x + nx * k * 0.6; m.position.z = z + nz * k * 0.6;
+      mat.opacity = (op || 0.5) * (1 - k) * (1 - k);
+    };
+    e.update(0, 0);
+    return fx.spawn(e);
+  }
+  /* warna rumput/tanah arena untuk serpihan yang tercungkil kaki */
+  FX.prototype.setTurf = function (surf) {
+    if (!surf) return;
+    this.turf = [surf.a || surf.base || '#4f8a34', surf.worn || surf.b || '#6b5a3a', !!(surf.neat && surf.edge) || !!surf.hard];
+  };
+  /* sentuhan kaki ke bola. pow 0..1.2, (dx, dz) arah tendangan, kind: 'pass' | 'lob' | 'jauh' | 'cungkil' | 'jurus' */
+  FX.prototype.kickFx = function (x, y, z, dx, dz, pow, kind) {
+    pow = U.clamp(U.num(pow, 0.6), 0.1, 1.3);
+    var l = Math.sqrt(dx * dx + dz * dz) || 1; dx /= l; dz /= l;
+    var pm = this.pm || 1, i, n;
+    var turf = this.turf || ['#4f8a34', '#6b5a3a', false];
+    var hard = turf[2];
+    var strong = kind === 'jauh' || kind === 'jurus' || pow > 0.75;
+    /* 1. kilat kontak kecil tepat di bola (sepatu menghantam kulit bola) */
+    this.flip('spark', x, y + 0.05, z, { size: 0.8 + pow * 0.9, c0: '#fff2d0', c1: '#ffffff', fps: 36, op: 0.9 });
+    /* 2. serpihan rumput & tanah tercungkil ke arah tendangan (lantai keras: hanya debu halus) */
+    n = Math.round((hard ? 4 : 8 + pow * 16) * pm);
+    for (i = 0; i < n; i++) {
+      var sp = (1.5 + Math.random() * 3.5) * (0.5 + pow * 0.6), side = (Math.random() - 0.5) * 1.6;
+      this.normPS.emit(x - dx * 0.15 + (Math.random() - 0.5) * 0.12, 0.05, z - dz * 0.15 + (Math.random() - 0.5) * 0.12,
+        dx * sp - dz * side, 1.8 + Math.random() * 2.6 * (0.4 + pow * 0.5), dz * sp + dx * side,
+        0.5 + Math.random() * 0.45, 0.09 + Math.random() * 0.07, 0.06, i % 3 ? turf[0] : turf[1], turf[1], 1, 9.8, 0.985);
+    }
+    /* 3. kepulan debu rendah di titik tumpu, condong ke belakang kaki */
+    n = Math.round((strong ? 7 : 4) * pm);
+    for (i = 0; i < n; i++) {
+      var a = Math.random() * U.TAU;
+      this.normPS.emit(x - dx * 0.3, 0.08, z - dz * 0.3, Math.cos(a) * 0.9 - dx * 0.6, 0.25 + Math.random() * 0.45, Math.sin(a) * 0.9 - dz * 0.6,
+        0.55 + Math.random() * 0.5, 0.3, 1.0 + pow * 0.5, this.dustCol || '#cdb48a', this.dustCol2 || '#9c805a', hard ? 0.32 : 0.45, -0.15, 0.95);
+    }
+    /* 4. cincin tekanan udara saat tendangan keras */
+    if (strong) airRing(this, x + dx * 0.25, y + 0.05, z + dz * 0.25, dx, dz, 0.9 + pow * 0.9, 0.3, '#ffffff', 0.38 + pow * 0.2);
+    /* 5. jejak udara yang mengikuti bola sesaat (makin keras makin panjang) */
+    if (pow > 0.35 || kind === 'cungkil' || kind === 'lob') this.ballStreak(0.25 + pow * 0.45, kind === 'cungkil' || kind === 'lob' ? 0.55 : 1);
+  };
+  /* jejak udara: garis partikel putih tipis di sepanjang lintasan bola yang baru ditendang */
+  FX.prototype.ballStreak = function (dur, w) {
+    var fx = this, prev = null, ball = this.ballGroup;
+    if (!ball) return;
+    if (this.streakE && !this.streakE.dead) { this.streakE.life = Math.max(this.streakE.life, this.streakE.t + dur); return; }
+    var e = { life: dur };
+    e.update = function (dt, t) {
+      var p = ball.position;
+      if (!ball.visible) { prev = null; return; }
+      if (prev) {
+        var ddx = p.x - prev.x, ddy = p.y - prev.y, ddz = p.z - prev.z, d = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz);
+        if (d > 0.02 && d < 4) {
+          var k = Math.max(1, Math.ceil(d / 0.07)), fade = 1 - t / e.life;
+          for (var i = 0; i < k; i++) {
+            var f = i / k;
+            fx.addPS.emit(prev.x + ddx * f, prev.y + ddy * f, prev.z + ddz * f, 0, 0, 0, 0.18 + 0.1 * fade, 0.17 * (w || 1), 0.02, '#ffffff', '#cfe6ff', 0.32 * fade, 0, 1);
+          }
+        }
+      }
+      prev = { x: p.x, y: p.y, z: p.z };
+    };
+    this.streakE = this.spawn(e);
+  };
+  /* kiper menangkap / menepis. (x, y, z) titik bola mengenai sarung tangan, face = arah keluar dari gawang (+1/−1 di sumbu x),
+     kind: 'catch' | 'parry' | 'smother' | 'punch', pow = kerasnya tendangan 0..1.3 */
+  FX.prototype.keeperFx = function (x, y, z, face, kind, pow, col) {
+    pow = U.clamp(U.num(pow, 0.7), 0.2, 1.3);
+    var pm = this.pm || 1, i, n, fx = this;
+    face = face >= 0 ? 1 : -1;
+    var catchIt = kind === 'catch' || kind === 'smother';
+    /* 1. sentakan di sarung tangan: kilat putih kecil + cincin tekanan menghadap datangnya bola */
+    this.flip('spark', x, y, z, { size: catchIt ? 0.7 + pow * 0.5 : 1.1 + pow * 0.9, c0: col || '#e8f6ff', c1: '#ffffff', fps: catchIt ? 44 : 34, op: catchIt ? 0.75 : 1 });
+    airRing(this, x, y, z, face, 0, catchIt ? 0.8 + pow * 0.6 : 1.3 + pow * 0.8, catchIt ? 0.26 : 0.34, col || '#dff3ff', catchIt ? 0.45 : 0.6);
+    /* 2. serbuk kapur / keringat dari sarung tangan */
+    n = Math.round((catchIt ? 9 : 6) * pm);
+    for (i = 0; i < n; i++) {
+      var a = Math.random() * U.TAU;
+      this.normPS.emit(x + face * 0.08, y, z, face * (0.4 + Math.random() * 0.9) + Math.cos(a) * 0.5, Math.random() * 0.9 - 0.1, Math.sin(a) * 0.9,
+        0.4 + Math.random() * 0.35, 0.07, 0.38, '#f4f1ea', '#cfc8bb', 0.35, -0.3, 0.93);
+    }
+    if (catchIt) {
+      /* 3. bola diredam: percik kecil berputar lalu padam (sisa putaran bola di pelukan) */
+      var t0 = 0, e = { life: 0.35 };
+      e.update = function (dt, t) {
+        t0 += dt;
+        if (Math.random() < 0.7) {
+          var ang = t * 22 + Math.random() * 0.5, r = 0.2;
+          fx.addPS.emit(x + face * 0.05, y + Math.sin(ang) * r, z + Math.cos(ang) * r, face * 0.4, Math.sin(ang) * 1.2, Math.cos(ang) * 1.2,
+            0.22, 0.09 * (1 - t / e.life), 0.02, '#fff3c0', fx.fire[0], 0.8, 0, 0.9);
+        }
+      };
+      this.spawn(e);
+    } else {
+      /* 3. tepisan: semburan percik ke arah luar gawang + sedikit asap api yang terpecah */
+      n = Math.round((10 + pow * 18) * pm);
+      for (i = 0; i < n; i++) {
+        var s2 = 3 + Math.random() * 6, up = Math.random() * 3.5, sd = (Math.random() - 0.5) * 6;
+        this.addPS.emit(x, y, z, face * s2, up, sd, 0.25 + Math.random() * 0.3, 0.12, 0.02, '#ffffff', col || '#bfe9ff', 1, 6, 0.95);
+      }
+      this.burst(x, y, z, 'smoke', { n: 6 });
+    }
+    /* 4. kiper terbang menyentuh tanah: debu & rumput terlempar di sisi badan */
+    if (y < 1.0 || kind === 'smother') {
+      n = Math.round(8 * pm);
+      for (i = 0; i < n; i++) {
+        var a2 = Math.random() * U.TAU, tf = this.turf || ['#4f8a34', '#6b5a3a'];
+        this.normPS.emit(x - face * 0.4, 0.08, z, Math.cos(a2) * 1.6, 0.6 + Math.random() * 1.2, Math.sin(a2) * 1.6, 0.5 + Math.random() * 0.3, 0.06, 0.04, tf[0], tf[1], 1, 9.8, 0.98);
+      }
+      this.burst(x - face * 0.4, 0.1, z, 'dust', { n: 8 });
+    }
+  };
+
   /* ---------- penanda pemain yang dipegang manusia (sampai 8 kursi) ---------- */
   function glow(col, op) { return new THREE.MeshBasicMaterial({ color: new THREE.Color(col), transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }); }
   FX.prototype.seatMarker = function (k, p, on, col, arrow) {
