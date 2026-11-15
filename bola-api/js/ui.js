@@ -398,9 +398,11 @@
     }
     if (mode === 'quick' || mode === 'pen' || mode === 'host') {
       var s0 = sect(box, mode === 'host' ? 'Tim NPC (dipakai bila Tim B tanpa pemain manusia)' : 'Lawan'); var c0 = el('div', 'chips'); s0.appendChild(c0);
-      var opts = D.TEAMS.map(function (t, i) { var kn = t.kind && t.kind !== 'manusia' ? ' · ' + BA.t((D.kindById[t.kind] || {}).n || '') : ''; return { id: i, n: t.name + kn + ' ' + '★'.repeat(t.level + 1), dot: t.c1 }; });
+      var opts = D.TEAMS.map(function (t, i) { var kn = t.world ? ' · ' + BA.t('Bintang Dunia') : (t.kind && t.kind !== 'manusia' ? ' · ' + BA.t((D.kindById[t.kind] || {}).n || '') : ''); return { id: i, n: t.name + kn + ' ' + '★'.repeat(t.level + 1), dot: t.c1 }; });
       opts.push({ id: -1, n: 'Acak' });
       chips(c0, opts, cfg.opp, function (v) { cfg.opp = v; re(); });
+      var od = cfg.opp >= 0 ? D.TEAMS[cfg.opp] : null;
+      if (od && od.desc) s0.appendChild(el('p', 'hint', BA.t(od.desc)));
     }
     if (mode === 'practice') {
       var sp = sect(box, 'Penendang'); var cp = el('div', 'chips'); sp.appendChild(cp);
