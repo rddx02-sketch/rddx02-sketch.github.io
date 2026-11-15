@@ -261,6 +261,41 @@
     $('teamTabPemain').classList.toggle('hidden', t !== 'pemain');
     UI.renderTeam();
   };
+  /* pilihan tim siap pakai: ketuk tim → keterangan + tombol "Pakai tim ini" (dua langkah supaya tidak tertukar tak sengaja) */
+  UI.presetSel = -1;
+  UI.renderPresets = function () {
+    var App = BA.App, box = $('chPreset'), act = $('presetAct'), hint = $('presetHint'), now = $('presetNow');
+    if (!box) return;
+    var order = [];
+    D.TEAMS.forEach(function (t, i) { if (t.world) order.push(i); });
+    D.TEAMS.forEach(function (t, i) { if (!t.world) order.push(i); });
+    var fromIdx = -1;
+    D.TEAMS.forEach(function (t, i) { if (App.teamFrom && t.short === App.teamFrom) fromIdx = i; });
+    var cur = UI.presetSel >= 0 ? UI.presetSel : fromIdx;
+    chips(box, order.map(function (i) { var t = D.TEAMS[i]; return { id: i, n: t.name + (t.world ? ' · ' + BA.t('Bintang Dunia') : '') + ' ' + '★'.repeat(t.level + 1), dot: t.c1 }; }), cur, function (v) {
+      UI.presetSel = UI.presetSel === v ? -1 : v; UI.renderPresets();
+    });
+    now.textContent = fromIdx >= 0 ? BA.t('Sekarang kamu memakai tim {0}. Nama, wajah, dan jurus pemainnya tetap bisa kamu ubah.', D.TEAMS[fromIdx].name)
+      : BA.t('Pakai salah satu tim bawaan, termasuk tim Bintang Dunia, sebagai timmu sendiri.');
+    clear(act);
+    var sel = UI.presetSel >= 0 ? D.TEAMS[UI.presetSel] : null;
+    hint.textContent = sel ? ((sel.desc ? BA.t(sel.desc) + ' ' : '') + (App.teamFrom ? '' : BA.t('Tim buatanmu yang sekarang disimpan dulu, jadi bisa dipakai lagi kapan saja.'))) : '';
+    if (sel && UI.presetSel !== fromIdx) {
+      var go = el('button', 'btn main', BA.t('Pakai tim {0}', sel.name)); go.type = 'button';
+      go.addEventListener('click', function () {
+        click();
+        var nm = sel.name;
+        if (App.adoptTeam(UI.presetSel)) { UI.presetSel = -1; UI.renderTeam(); UI.toast(BA.t('Timmu sekarang {0}', nm)); }
+      });
+      act.appendChild(go);
+    }
+    if (App.teamFrom && App.hasTeamBackup()) {
+      var back = el('button', 'btn', BA.t('Kembali ke tim buatanku')); back.type = 'button';
+      back.addEventListener('click', function () { click(); if (App.restoreOwnTeam()) { UI.presetSel = -1; UI.renderTeam(); UI.toast(BA.t('Tim buatanmu dipakai lagi')); } });
+      act.appendChild(back);
+    }
+    act.hidden = !act.childNodes.length;
+  };
   UI.renderTeam = function () {
     var T = BA.App.myTeam, save = function () { BA.App.saveTeam(); UI.renderTeam(); };
     var nm = $('inTeamName'), sh = $('inTeamShort');
@@ -271,6 +306,7 @@
       nm.addEventListener('input', function () { BA.App.myTeam.name = U.cleanText(nm.value, 20) || 'Tim Kampung'; BA.App.saveTeam(true); });
       sh.addEventListener('input', function () { BA.App.myTeam.short = (U.cleanText(sh.value, 3) || 'TIM').toUpperCase(); BA.App.saveTeam(true); });
     }
+    UI.renderPresets();
     swatches($('swC1'), D.TEAM_COLORS, T.c1, function (c) { T.c1 = c; save(); });
     swatches($('swC2'), D.TEAM_COLORS, T.c2, function (c) { T.c2 = c; save(); });
     swatches($('swGK'), D.TEAM_COLORS, T.gk, function (c) { T.gk = c; save(); });

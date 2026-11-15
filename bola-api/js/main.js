@@ -62,6 +62,31 @@
     App.showcaseChars = true;
     if (quiet) App.previewPlayer(UI.teamSel);
   };
+  /* ---------- tim siap pakai: pakai salah satu tim bawaan (mis. tim Bintang Dunia) sebagai Tim Saya ---------- */
+  App.teamFrom = String(U.store.get('teamFrom', '') || '');
+  App.hasTeamBackup = function () { return !!U.store.get('teamBackup', null); };
+  App.adoptTeam = function (i) {
+    var src = D.TEAMS[i];
+    if (!src) return false;
+    /* tim buatan sendiri disimpan sekali saja: berganti-ganti tim siap pakai tidak menimpanya */
+    if (!App.teamFrom || !App.hasTeamBackup()) U.store.set('teamBackup', U.copy(App.myTeam));
+    var t = D.sanitizeTeam(U.copy(src));
+    App.myTeam = t;
+    App.teamFrom = src.short;
+    U.store.set('teamFrom', App.teamFrom);
+    UI.teamSel = Math.min(UI.teamSel || 0, t.players.length - 1);
+    App.saveTeam(true);
+    return true;
+  };
+  App.restoreOwnTeam = function () {
+    var b = U.store.get('teamBackup', null);
+    if (!b) return false;
+    App.myTeam = D.sanitizeTeam(b);
+    App.teamFrom = '';
+    U.store.set('teamFrom', '');
+    App.saveTeam(true);
+    return true;
+  };
   App.saveSetup = function () { U.store.set('setups', App.setups); };
   App.setSetting = function (k, v) {
     App.settings[k] = v;
@@ -108,6 +133,7 @@
   App.resetData = function () {
     App.records = { played: 0, wins: 0, draws: 0, losses: 0, goals: 0, best: 0, cups: 0 };
     App.myTeam = D.defaultMyTeam();
+    App.teamFrom = ''; U.store.set('teamFrom', ''); U.store.set('teamBackup', null);
     App.setups = {};
     U.store.set('records', App.records); U.store.set('team', App.myTeam); U.store.set('setups', App.setups);
     App.showcaseChars = true;
