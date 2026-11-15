@@ -60,6 +60,7 @@
     ui.cineStart({ att: att, shooter: tName, shot: shot.name, ult: ult, perfect: !!c.perfect, combo: !!c.combo, pen: !!c.pen });
     var au = this.ctx.audio;
     if (au) au.whoosh(ult ? 1.4 : 1);
+    if (fx.chargeAura) fx.chargeAura(this.from, shot.fire[0], shot.fire[1], this.T.a);
   };
 
   Cine.prototype.skip = function () {
@@ -149,6 +150,8 @@
         fx.scorch(from.x, from.z, this.shot.fire[1], ult ? 2.2 : 1.6, 7);
         fx.emberRain(from.x, 1.2, from.z, this.shot.fire[1], 30, 2.2);
         if (fx.cineLight) { fx.cineLight.position.set(from.x, 1.2, from.z); fx.cineLight.color.set(this.shot.fire[1]); fx.cineLight.intensity = 5; }
+        if (fx.shotBurst) this.emblemFx = fx.shotBurst(c.type, from, dir, this.shot.fire[0], this.shot.fire[1], ult);
+        if (ui.impact) ui.impact(ult ? 260 : 190);
         ui.flash(this.shot.fire[1], 160, 0.45);
         this.ctx.rig.kick(0.55);
         if (au) { au.kick(1.3); au.roar(c.type); }
@@ -180,6 +183,8 @@
         var at = { x: this.keepAt.x + dir * 0.2, y: this.keepAt.y, z: this.keepAt.z };
         if (this.skill) this.skillFx = fx.skillFx(c.skill, at, -dir, { life: 9 });
         else this.skillFx = fx.skillFx('', at, -dir, { life: 9 });
+        if (fx.skillBurst && this.skill) fx.skillBurst(this.skill.fx, at, -dir, this.skill.col);
+        if (fx.clashBurst) fx.clashBurst({ x: at.x - dir * 0.7, y: at.y, z: at.z }, this.skill ? this.skill.col : '#bfe9ff', '#ffffff');
         ui.cineAttFade();
         ui.cineDefend({ keeper: this.kp ? this.kp.name : 'Kiper', skill: this.skill ? this.skill.name : 'Tangkapan Biasa', special: !!this.skill, sp: c.sp, kp: c.kp });
         if (au) { au.clash(); if (this.skill) au.skill(this.skill.fx); }
@@ -252,6 +257,8 @@
       fx.emberRain(tgt.x, 2.2, tgt.z, this.shot.fire[1], 60, 3);
       fx.burst(tgt.x, 0.3, tgt.z, 'debris', { n: 20 });
       if (fx.cineLight) { fx.cineLightOwner = null; fx.cineLight.position.set(tgt.x, tgt.y + 0.5, tgt.z); fx.cineLight.color.set(this.shot.fire[1]); fx.cineLight.intensity = 7; }
+      if (fx.goalBlast) fx.goalBlast(tgt.x, tgt.y, tgt.z, dir, this.shot.fire[0], this.shot.fire[1]);
+      if (ui.impact) ui.impact(240);
       ui.flash('#ffffff', 220, 0.75);
       if (this.ctx.arena) this.ctx.arena.bulge(dir, tgt.z, tgt.y);
       this.ctx.rig.kick(1.1);
@@ -261,6 +268,8 @@
       if (this.shape) this.shape.fade(0.6);
       ui.flash(this.skill ? this.skill.col : '#dff4ff', 140, 0.4);
       fx.emberRain(hp.x, hp.y + 0.3, hp.z, this.shot.fire[1], 24, 2);
+      if (fx.impactFx) fx.impactFx(hp.x, hp.y, hp.z, c.res === 'catch' ? 2.6 : 3.6, this.skill ? this.skill.col : '#dff4ff', '#ffffff');
+      if (fx.flip && c.res !== 'catch') fx.flip('bolt', hp.x, hp.y, hp.z, { size: 3.6, c0: this.shot.fire[0], c1: this.shot.fire[1], fps: 30 });
       if (c.res === 'catch') {
         fx.burst(hp.x, hp.y, hp.z, 'smoke', { n: 18 });
         if (this.skillFx && this.skillFx.hold) this.skillFx.hold(); else fx.burst(hp.x, hp.y, hp.z, 'steam', { n: 26 });

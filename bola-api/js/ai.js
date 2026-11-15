@@ -28,11 +28,11 @@
 
   S.assignDefense = function (team, car) {
     var self = this;
-    var human = this.humans[team] ? this.active[team] : null, human2 = this.coop && team === 0 ? this.active2 : null;
-    var defs = this.players.filter(function (p) { return p.team === team && p.role !== 'GK' && !p.hidden && p !== human && p !== human2; });
+    var defs = this.players.filter(function (p) { return p.team === team && p.role !== 'GK' && !p.hidden && !self.isCtl(p); });
     defs.forEach(function (p) { p.markTarget = null; });
     defs.sort(function (a, b) { return U.dist(a.x, a.z, car.x, car.z) - U.dist(b.x, b.z, car.x, car.z); });
-    var humanPress = human && U.dist(human.x, human.z, car.x, car.z) < 3.2;
+    var humanPress = false; /* ada pemain manusia yang sudah menekan pembawa bola? */
+    if (this.humans[team]) this.seats.forEach(function (st) { if (st && st.team === team && st.p && !st.p.hidden && U.dist(st.p.x, st.p.z, car.x, car.z) < 3.2) humanPress = true; });
     this.presser[team] = humanPress ? null : (defs[0] || null);
     var start = humanPress ? 0 : 1;
     this.cover[team] = defs[start] || null;
@@ -116,6 +116,7 @@
       if (thd > 4 && dGoal > 13 * F.ss) pr *= 0.5;
       if (this.rng() < pr) { var a = this.aiShotParams(p); this.doShot(p, a.charge, a.zc, a.zr); return; }
     }
+    if (this.aiStrike(p, dGoal, thd)) return;
     if (thd < 2.4 || hot) {
       if (this.rng() < (hot ? 0.95 : 0.45) && this.aiTryPass(p, true)) return;
       if (p.gocekCD <= 0 && this.rng() < 0.2) { this.doGocek(p, 0); return; }
@@ -268,6 +269,7 @@
 
   S.aiKeeper = function (p, dt) {
     var b = this.ball, dir = this.dirOf(p.team), gx = -dir * F.L / 2;
+    if (b.shot && b.shot.team !== p.team) { this.keeperVsShot(p, dt); return; }
     if (b.owner === p) {
       if (p.gkHold) {
         p.dvx = 0; p.dvz = 0;

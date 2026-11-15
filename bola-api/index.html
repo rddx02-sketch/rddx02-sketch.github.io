@@ -27,6 +27,7 @@
 <div id="ui">
   <div id="loading"><div class="t">BOLA API ARENA<small id="loadMsg">Menyalakan bola api…</small></div></div>
   <div id="flash" hidden aria-hidden="true"></div>
+  <div id="impact" hidden aria-hidden="true"></div>
   <button id="btnFs" class="fsBtn" aria-label="Layar penuh" title="Layar penuh (F11)" hidden>⛶</button>
   <div id="layoutEdit" hidden>
     <div class="leBar">
@@ -55,9 +56,13 @@
         </div>
         <div class="menuRow">
           <button class="sign" data-go="team">Tim Saya</button>
-          <button class="sign" data-go="guide">Panduan</button>
+          <button class="sign" data-go="strategy">Strategi &amp; Formasi</button>
         </div>
-        <button class="sign" data-go="settings">Pengaturan <small>Kontrol, narator, grafis</small></button>
+        <div class="menuRow">
+          <button class="sign" data-go="guide">Panduan</button>
+          <button class="sign" data-go="settings">Pengaturan</button>
+        </div>
+        <div class="langRow" role="group" aria-label="Bahasa / Language"><span aria-hidden="true">🌐</span><button class="chip" type="button" data-lang="id">Bahasa Indonesia</button><button class="chip" type="button" data-lang="en">English</button></div>
       </nav>
     </div>
   </section>
@@ -107,7 +112,7 @@
   <section id="scrSetup" class="scr dim" hidden>
     <div class="topbar"><button class="back" data-back aria-label="Kembali">←</button><h2 id="setupTitle">Tanding Cepat</h2></div>
     <div class="scroll" id="setupBody"></div>
-    <div class="actions" style="max-width:900px;width:100%;margin:0 auto;"><button class="btn main" id="btnStart">Mulai Tanding</button></div>
+    <div class="actions" style="max-width:900px;width:100%;margin:0 auto;"><button class="btn" id="btnSetupStrategy" type="button">Strategi &amp; formasi</button><button class="btn main" id="btnStart">Mulai Tanding</button></div>
   </section>
 
   <!-- ===== Online ===== -->
@@ -130,7 +135,7 @@
       <!-- WiFi lokal / hotspot: tanpa internet, tanpa server -->
       <div class="sect" id="onLan" hidden>
         <h3>📶 Main lewat WiFi / hotspot yang sama (tanpa internet)</h3>
-        <p class="hint">Kedua HP tersambung ke WiFi yang sama, atau satu HP menyalakan hotspot dan HP lain bergabung. Tukar <b>kode sambungan</b> lewat QR, tombol Bagikan (WhatsApp/Bluetooth share), atau salin-tempel. Bluetooth hanya untuk mengirim kodenya; permainan berjalan lewat WiFi.</p>
+        <p class="hint">Semua HP tersambung ke WiFi yang sama, atau satu HP menyalakan hotspot dan HP lain bergabung. Tuan rumah membuat satu kode undangan untuk tiap tamu (sampai 7 tamu). Tukar <b>kode sambungan</b> lewat QR, tombol Bagikan (WhatsApp/Bluetooth share), atau salin-tempel. Bluetooth hanya untuk mengirim kodenya; permainan berjalan lewat WiFi.</p>
         <div class="chips"><button class="chip on" data-lan="host">Tuan rumah</button><button class="chip" data-lan="guest">Tamu</button></div>
         <div id="lanHost">
           <div class="actions" style="justify-content:flex-start;"><button class="btn main" id="btnLanOffer" type="button">1. Buat kode undangan</button></div>
@@ -171,9 +176,12 @@
         </div>
       </div>
       <div class="hidden" id="onYes">
+        <div class="sect" id="onNickSect">
+          <div class="field" style="max-width:320px;"><label for="inNick">Nama kamu di room (terlihat pemain lain)</label><input id="inNick" type="text" maxlength="12" autocomplete="off" placeholder="Pemain"></div>
+        </div>
         <div class="sect" id="onChoose">
           <div class="chips"><button class="chip on" data-onl="host">Buat Room</button><button class="chip" data-onl="guest">Gabung Room</button><button class="chip" data-onl="lan">📶 WiFi lokal</button></div>
-          <p class="hint">Kedua pemain membuka tautan game ini di browser HP/PC masing-masing (semua jenis perangkat bisa). Tuan rumah memegang aturan pertandingan.</p>
+          <p class="hint">Sampai <b>8 pemain</b> dalam satu room. Semua membuka tautan game ini di browser HP/PC masing-masing (semua jenis perangkat bisa). Tuan rumah memegang aturan dan membagi tim: semua satu tim melawan NPC, atau dibagi berapa lawan berapa pun; posisi kosong diisi NPC.</p>
         </div>
         <div id="onHost">
           <div class="sect" id="hostQrSect">
@@ -182,8 +190,8 @@
               <div style="display:grid;gap:8px;min-width:0;">
                 <div class="eyebrow">Kode room</div>
                 <div class="bigCode" id="roomCode">----</div>
-                <div class="status wait" id="hostStatus"><i></i><span>Menunggu lawan memindai…</span></div>
-                <p class="hint">Lawan: pindai QR ini dengan kamera, buka tautan yang dibagikan, atau ketik kodenya di <b>Main Online → Gabung Room</b>.</p>
+                <div class="status wait" id="hostStatus"><i></i><span>Menunggu pemain lain memindai…</span></div>
+                <p class="hint">Pemain lain: pindai QR ini dengan kamera, buka tautan yang dibagikan, atau ketik kodenya di <b>Main Online → Gabung Room</b>.</p>
                 <div class="actions" style="justify-content:flex-start;"><button class="btn" id="btnShareLink" type="button">📤 Bagikan tautan (WhatsApp dll.)</button></div>
                 <div class="hint linkBox" id="roomLink" hidden></div>
               </div>
@@ -193,7 +201,7 @@
           <div class="sect">
             <h3>Aturan pertandingan</h3>
             <div id="hostCfgSummary" class="hint"></div>
-            <div class="actions"><button class="btn" id="btnHostCfg">Ubah aturan</button><button class="btn main" id="btnHostStart" disabled>Mulai</button></div>
+            <div class="actions"><button class="btn" id="btnHostCfg">Ubah aturan</button><button class="btn" id="btnHostStrategy" type="button">Strategi tim saya</button><button class="btn main" id="btnHostStart" disabled>Mulai</button></div>
           </div>
         </div>
         <div id="onGuest" class="hidden">
@@ -219,7 +227,7 @@
           <div class="sect hidden" id="guestVs"></div>
           <div class="sect hidden" id="guestReady">
             <div id="guestCfgSummary" class="hint"></div>
-            <div class="actions"><button class="btn main" id="btnGuestReady">Saya siap</button></div>
+            <div class="actions"><button class="btn" id="btnGuestStrategy" type="button">Strategi tim saya</button><button class="btn main" id="btnGuestReady">Saya siap</button></div>
           </div>
         </div>
       </div>
@@ -269,8 +277,9 @@
       <div class="tally hidden" id="tally"></div>
       <button class="hudBtn" id="btnPause" aria-label="Jeda">❚❚</button>
       <div id="hudInfo"></div>
-      <div class="me" id="me"><b id="meName"></b><span id="meShot"></span><div class="bar"><i id="meStam" style="width:100%"></i></div></div>
-      <div class="comment" id="comment" style="opacity:0"></div>
+      <div class="me" id="me"><b id="meName"></b><span id="meShot"></span><div class="bar"><i id="meStam" style="width:100%"></i></div><em id="meFit"></em></div>
+      <button class="fitStrip" id="fitStrip" type="button" hidden aria-label="Kondisi pemain. Ketuk untuk strategi dan ganti pemain"></button>
+      <div class="comment" id="comment" style="opacity:0" data-noi18n></div>
       <div class="keyLegend" id="keyLegend"></div>
       <canvas id="minimap" width="200" height="130" hidden aria-label="Peta mini lapangan"></canvas>
       <div id="bannerHost"></div>
@@ -281,12 +290,14 @@
       <div id="joyBase"><div id="joyKnob"></div></div>
       <div class="joyHint" id="joyHint">Geser di sini untuk lari</div>
       <div class="pad">
-        <button class="pbtn" id="bShoot">TENDANG</button>
-        <button class="pbtn" id="bPass">OPER</button>
-        <button class="pbtn" id="bLob">LAMBUNG</button>
-        <button class="pbtn" id="bGocek">GOCEK</button>
-        <button class="pbtn" id="bSwitch">GANTI</button>
-        <button class="pbtn" id="bSprint">SPRINT</button>
+        <button class="pbtn" id="bShoot" aria-label="Tendangan jurus">TENDANG</button>
+        <button class="pbtn" id="bLong" aria-label="Tendangan jauh">JAUH</button>
+        <button class="pbtn" id="bChip" aria-label="Tendangan cungkil">CUNGKIL</button>
+        <button class="pbtn" id="bPass" aria-label="Oper datar">OPER</button>
+        <button class="pbtn" id="bLob" aria-label="Umpan lambung">LAMBUNG</button>
+        <button class="pbtn" id="bGocek" aria-label="Gocek atau rebut bola">GOCEK</button>
+        <button class="pbtn" id="bSwitch" aria-label="Ganti pemain">GANTI</button>
+        <button class="pbtn" id="bSprint" aria-label="Lari cepat">LARI</button>
       </div>
     </div>
     <div id="aim" hidden>
@@ -303,7 +314,6 @@
       <div id="cineClash"></div>
       <div id="cineRes"></div>
       <div class="skipHint" id="skipHint">Ketuk layar untuk lewati</div>
-      <div class="flash" id="flash"></div>
     </div>
   </div>
 
@@ -313,10 +323,17 @@
       <h2 style="font-family:var(--f-display);font-weight:400;color:var(--flame);">Jeda</h2>
       <p class="hint" id="pauseHint"></p>
       <button class="btn main" id="btnResume">Lanjut main</button>
+      <button class="btn aura" id="btnStrategy">Strategi &amp; ganti pemain</button>
       <button class="btn" id="btnRestart">Ulang pertandingan</button>
       <button class="btn" id="btnPauseSettings">Pengaturan</button>
       <button class="btn" id="btnQuit">Keluar ke menu</button>
     </div>
+  </section>
+
+  <!-- ===== Strategi: formasi, taktik, susunan pemain, kebugaran, pergantian ===== -->
+  <section id="scrStrategy" class="scr dim" hidden>
+    <div class="topbar"><button class="back" data-back aria-label="Kembali">←</button><h2 id="stratTitle">Strategi &amp; Formasi</h2></div>
+    <div class="scroll" id="stratBody"></div>
   </section>
 
   <div id="modal" class="modal" hidden><div class="panel"><h3 id="modalTitle"></h3><p class="hint" id="modalText"></p><div class="actions" id="modalActions"></div></div></div>
@@ -326,13 +343,21 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script src="js/util.js"></script>
+<script src="js/i18n.js"></script>
+<script src="js/lang_en.js"></script>
+<script src="js/guide.js"></script>
 <script src="js/data.js"></script>
+<script src="js/data2.js"></script>
 <script src="js/sim.js"></script>
 <script src="js/ai.js"></script>
+<script src="js/sim2.js"></script>
 <script src="js/render.js"></script>
 <script src="js/chars.js"></script>
 <script src="js/arena.js"></script>
+<script src="js/arena2.js"></script>
+<script src="js/arena3.js"></script>
 <script src="js/fx.js"></script>
+<script src="js/fx2.js"></script>
 <script src="js/cine.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/narrator.js"></script>
@@ -340,6 +365,7 @@
 <script src="js/net.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/layout.js"></script>
+<script src="js/ui2.js"></script>
 <script src="js/game.js"></script>
 <script src="js/main.js"></script>
 

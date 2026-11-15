@@ -1,4 +1,4 @@
-/* Bola Api Arena — mode online lewat kapabilitas "room" (kode / QR), plus tampilan jarak jauh untuk tamu */
+/* Bola Api Arena — mode online sampai 8 pemain (1 tuan rumah + 7 tamu): room claude.ai, Supabase Realtime, atau WiFi lokal (WebRTC); plus tampilan jarak jauh untuk tamu */
 (function (root) {
   'use strict';
   var BA = root.BA, U = BA.U, D = BA.D, Sim = BA.Sim;
@@ -43,46 +43,114 @@
     if (root.supabase && typeof root.supabase.createClient === 'function') { try { return Promise.resolve(mk()); } catch (e) { return Promise.reject(e); } }
     return loadScript(Net.SB.lib).then(mk);
   };
+  /* ======================================================================
+     DAFTAR PESERTA ROOM (sama untuk semua jalur: room claude.ai, Supabase, WiFi lokal)
+     Tuan rumah melihat semua tamu (sampai 7); tamu hanya melihat tuan rumah.
+     peers[id] = { id, role: 'h'|'g', pres: keadaan terakhir, at: waktu kabar terakhir, seq: urutan masuk }
+     ====================================================================== */
   Net.myId = 'u' + Math.random().toString(36).slice(2, 10);
+  Net.peers = {}; Net.selfId = ''; Net.joinSeq = 0; Net.V = 2; Net.MAX_GUESTS = 7;
+  var FAST = ['s', 'e', 'i', 'ack', 'cmd'];
+  function wanted(r) { return Net.role === 'host' ? r === 'g' : r === 'h'; }
+  function refreshOther() {
+    var list = Net.peerList();
+    var p = list[0] || null;
+    Net.other = p ? p.pres : null; Net.otherPeer = p ? p.id : null;
+  }
+  /* daftar peserta lain menurut urutan masuk */
+  Net.peerList = function () {
+    return Object.keys(Net.peers).map(function (k) { return Net.peers[k]; }).sort(function (a, b) { return a.seq - b.seq; });
+  };
+  Net.hostPeer = function () { var l = Net.peerList(); for (var i = 0; i < l.length; i++) if (l[i].role === 'h') return l[i]; return null; };
+  Net.guestPeers = function () { return Net.peerList().filter(function (p) { return p.role === 'g'; }); };
+  function peerSet(id, role, pres, partial) {
+    if (!id || !wanted(role)) return null;
+    var p = Net.peers[id], isNew = !p;
+    if (isNew) {
+      if (partial) return null; /* kiriman cepat dari peserta yang belum dikenal: tunggu kabar lengkapnya */
+      if (Net.role === 'host' && Object.keys(Net.peers).length >= Net.MAX_GUESTS) return null;
+      if (Net.role === 'guest' && Object.keys(Net.peers).length >= 1) return null; /* hanya satu tuan rumah */
+      p = Net.peers[id] = { id: id, role: role, pres: {}, at: 0, seq: ++Net.joinSeq };
+    }
+    if (partial) { Object.keys(pres).forEach(function (k) { if (pres[k] === null) delete p.pres[k]; else p.pres[k] = pres[k]; }); }
+    else {
+      var np = pres || {};
+      /* Supabase & WiFi lokal: kabar lengkap saat laga tidak membawa kiriman cepat, jadi yang terakhir diterima dipertahankan.
+         (Room claude.ai selalu membawa keadaan utuh, dan objeknya beku: jangan diubah.) */
+      if (!isNew && np.st === 'play' && (Net.sb || Net.lan)) {
+        var keep = null;
+        FAST.forEach(function (k) { if (np[k] === undefined && p.pres[k] !== undefined) { if (!keep) keep = Object.assign({}, np); keep[k] = p.pres[k]; } });
+        if (keep) np = keep;
+      }
+      p.pres = np;
+    }
+    p.at = Date.now(); Net.lastOtherAt = p.at;
+    refreshOther();
+    if (isNew) fire('joined', p);
+    fire('presence', p);
+    return p;
+  }
+  function peerDrop(id) {
+    var p = Net.peers[id];
+    if (!p) return;
+    delete Net.peers[id];
+    refreshOther();
+    fire('left', p);
+  }
+  function mergeMine(patch) {
+    var merged = Object.assign({}, Net.mine);
+    Object.keys(patch).forEach(function (k) { if (patch[k] === null) delete merged[k]; else merged[k] = patch[k]; });
+    return merged;
+  }
+
+  /* ---------- Supabase: presence untuk hadir/pergi, broadcast 'p' = keadaan lengkap, 'f' = kiriman cepat saat laga ---------- */
   Net.sbJoin = function (code, role, presence) {
     return Net.sbReady().then(function (client) {
       return new Promise(function (resolve, reject) {
         var topic = Net.roomName(code);
         var ch = client.channel(topic, { config: { presence: { key: Net.myId }, broadcast: { self: false, ack: false } } });
-        var want = role === 'host' ? 'g' : 'h', settled = false;
-        var sb = Net.sb = { ch: ch, topic: topic, role: role, peer: null };
-        Net.role = role; Net.code = code; Net.other = null; Net.otherPeer = null; Net.lastOtherAt = 0;
-        Net.mine = Object.assign({ r: role === 'host' ? 'h' : 'g', v: 1, id: Net.myId }, presence || {});
+        var settled = false;
+        var sb = Net.sb = { ch: ch, topic: topic, role: role };
+        Net.role = role; Net.code = code; Net.peers = {}; Net.other = null; Net.otherPeer = null; Net.lastOtherAt = 0; Net.selfId = Net.myId;
+        Net.mine = Object.assign({ r: role === 'host' ? 'h' : 'g', v: Net.V, id: Net.myId }, presence || {});
         function scan() {
           if (Net.sb !== sb) return;
-          var st = ch.presenceState() || {}, found = null;
-          Object.keys(st).sort().forEach(function (k) {
-            if (k === Net.myId || found) return;
-            var metas = st[k] || [], m = metas[0] || {};
-            if (m.r === want && m.v === 1) found = k;
+          var st = ch.presenceState() || {}, here = {}, fresh = false;
+          Object.keys(st).forEach(function (k) {
+            if (k === Net.myId) return;
+            var m = (st[k] || [])[0] || {};
+            if (m.v === Net.V && wanted(m.r)) { here[k] = 1; if (!Net.peers[k]) fresh = true; }
           });
-          if (found && found !== sb.peer) { sb.peer = found; Net.otherPeer = found; fire('joined', { peer: found }); Net.sbPush(); }
-          else if (!found && sb.peer) { sb.peer = null; Net.otherPeer = null; Net.other = null; fire('left', 'sb'); }
+          Object.keys(Net.peers).forEach(function (id) { if (!here[id]) peerDrop(id); });
+          if (fresh) Net.sbPush(); /* ada peserta baru: perkenalkan diri */
         }
         ch.on('presence', { event: 'sync' }, scan);
         ch.on('presence', { event: 'leave' }, scan);
         ch.on('broadcast', { event: 'p' }, function (msg) {
           if (Net.sb !== sb) return;
-          var p = msg && msg.payload; if (!p || p.id === Net.myId || p.r !== want) return;
-          if (!sb.peer) { sb.peer = p.id; Net.otherPeer = p.id; fire('joined', { peer: p.id }); }
-          Net.other = p; Net.lastOtherAt = Date.now(); fire('presence', p);
+          var p = msg && msg.payload;
+          if (!p || p.id === Net.myId || p.v !== Net.V) return;
+          var isNew = !Net.peers[p.id];
+          if (peerSet(p.id, p.r, p) && isNew) Net.sbPush();
+        });
+        ch.on('broadcast', { event: 'f' }, function (msg) {
+          if (Net.sb !== sb) return;
+          var p = msg && msg.payload;
+          if (!p || p.id === Net.myId || !p.d || typeof p.d !== 'object') return;
+          peerSet(p.id, p.r, p.d, true);
         });
         ch.subscribe(function (status, err) {
           if (Net.sb !== sb) return;
           if (status === 'SUBSCRIBED') {
-            ch.track({ r: Net.mine.r, v: 1 }).then(function () {
+            ch.track({ r: Net.mine.r, v: Net.V }).then(function () {
               if (!settled) { settled = true; Net.connected = true; fire('conn', true); resolve(ch); }
               Net.sbPush();
-              /* kirim ulang berkala selama lawan sudah hadir tapi kabarnya belum/lama tidak diterima — siaran pertama bisa hilang saat lawan baru bergabung */
+              /* kirim ulang berkala: siaran pertama bisa hilang saat peserta baru bergabung; keadaan lobi juga ikut tersegarkan */
               if (!sb.alive) sb.alive = setInterval(function () {
                 if (Net.sb !== sb) { clearInterval(sb.alive); return; }
-                if (sb.peer && Date.now() - Net.lastOtherAt > 1500) Net.sbPush();
-              }, 1200);
+                var st = ch.presenceState() || {}, others = Object.keys(st).filter(function (k) { return k !== Net.myId; }).length;
+                if (others > 0) Net.sbPush();
+              }, 1500);
             }, function (e) { if (!settled) { settled = true; reject({ code: 'track', message: String(e) }); } });
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             if (!settled) { settled = true; reject({ code: status.toLowerCase(), message: err ? String(err) : '' }); } else fire('error', { code: status.toLowerCase() });
@@ -92,24 +160,23 @@
       });
     });
   };
+  /* keadaan lengkap tanpa kiriman cepat (snapshot/event/masukan tidak diulang di siaran 'p') */
   Net.sbPush = function () {
     var sb = Net.sb; if (!sb) return;
-    try { sb.ch.send({ type: 'broadcast', event: 'p', payload: Net.mine }); } catch (e) { fire('sendError', e); }
+    var m = Net.mine, o = {};
+    Object.keys(m).forEach(function (k) { if (k !== 's' && k !== 'e' && k !== 'i') o[k] = m[k]; });
+    try { sb.ch.send({ type: 'broadcast', event: 'p', payload: o }); } catch (e) { fire('sendError', e); }
   };
-  Net.sbSend = function (patch) {
-    var merged = Object.assign({}, Net.mine);
-    Object.keys(patch).forEach(function (k) { if (patch[k] === null) delete merged[k]; else merged[k] = patch[k]; });
-    merged.r = Net.mine.r; merged.v = 1; merged.id = Net.myId;
-    Net.mine = merged;
-    Net.sbPush();
-    return Promise.resolve();
-  };
-  Net.sbLeave = function () {
-    var sb = Net.sb; if (!sb) return;
-    Net.sb = null;
+  function sbClose(sb) {
+    if (!sb) return;
     if (sb.alive) clearInterval(sb.alive);
     try { sb.ch.untrack(); } catch (e) { /* abaikan */ }
     try { sb.ch.unsubscribe(); if (Net.sbClient) Net.sbClient.removeChannel(sb.ch); } catch (e2) { /* abaikan */ }
+  }
+  Net.sbLeave = function () {
+    var sb = Net.sb; if (!sb) return;
+    Net.sb = null;
+    sbClose(sb);
   };
 
   /* cek apakah tampilan ini bisa memakai room (null = tidak bisa) */
@@ -145,7 +212,7 @@
 
   Net.join = function (code, role, presence) {
     if (Net.transport === 'sb') {
-      Net.leave();
+      Net.leave(); Net.flushClose();
       return Net.sbJoin(code, role, presence).catch(function (e) {
         /* socket kadang macet "connecting" (mis. setelah muat ulang paksa): buang klien, buat baru, coba sekali lagi */
         if (!e || !/timeout|timed_out|channel_error/.test(String(e.code))) throw e;
@@ -156,62 +223,86 @@
       });
     }
     if (!Net.room) return Promise.reject({ code: 'unavailable' });
-    Net.leave();
-    Net.role = role; Net.code = code; Net.other = null; Net.otherPeer = null; Net.lastOtherAt = 0; Net.mine = {};
+    Net.leave(); Net.flushClose();
+    Net.role = role; Net.code = code; Net.peers = {}; Net.other = null; Net.otherPeer = null; Net.lastOtherAt = 0; Net.mine = {}; Net.selfId = '';
     return Net.room.join(Net.roomName(code)).then(function (nr) {
       Net.nr = nr;
       Net.unsubs.push(nr.onPeers(function (ch) { Net.handlePeers(ch); }, function (e) { fire('error', e); }));
       Net.unsubs.push(nr.onConnection(function (c) { Net.connected = c; fire('conn', c); }, function (e) { fire('error', e); }));
-      return Net.send(Object.assign({ r: role === 'host' ? 'h' : 'g', v: 1 }, presence || {})).then(function () { return nr; });
+      return Net.send(Object.assign({ r: role === 'host' ? 'h' : 'g', v: Net.V }, presence || {})).then(function () { return nr; });
     });
   };
 
+  /* room claude.ai: label peer sama di semua halaman, jadi dipakai sebagai id peserta */
   Net.handlePeers = function (ch) {
-    var want = Net.role === 'host' ? 'g' : 'h';
-    var found = null;
+    var seen = {};
     (ch.peers || []).forEach(function (p) {
-      if (p.sameTab || p.kind !== 'viewer') return;
+      if (p.kind !== 'viewer') return;
+      if (p.sameTab) { Net.selfId = p.peer; return; }
       var pr = p.presence || {};
-      if (pr.r === want && pr.v === 1 && !found) found = p;
+      if (pr.v !== Net.V || !wanted(pr.r)) return;
+      var cur = Net.peers[p.peer];
+      if (cur) { seen[p.peer] = 1; if (cur.pres !== pr) peerSet(p.peer, pr.r, pr); }
+      else if (peerSet(p.peer, pr.r, pr)) seen[p.peer] = 1;
     });
-    var prevPeer = Net.otherPeer;
-    if (found) {
-      var isNew = !prevPeer || prevPeer !== found.peer;
-      Net.otherPeer = found.peer;
-      if (found.presence !== Net.other) { Net.other = found.presence; Net.lastOtherAt = Date.now(); fire('presence', found.presence); }
-      if (isNew) fire('joined', found);
-    } else if (prevPeer) {
-      var still = (ch.peers || []).some(function (p) { return p.peer === prevPeer; });
-      if (!still) { Net.otherPeer = null; Net.other = null; fire('left', prevPeer); }
-    }
+    Object.keys(Net.peers).forEach(function (id) { if (!seen[id]) peerDrop(id); });
   };
 
+  /* keadaan saya (lobi, daftar pemain, aturan): digabung & disiarkan ke semua peserta */
   Net.send = function (patch) {
-    if (Net.lan) return Net.lanSend(patch);
-    if (Net.sb) return Net.sbSend(patch);
+    if (Net.lan) { Net.mine = mergeMine(patch); lanCast({ p: Net.mine }); return Promise.resolve(); }
+    if (Net.sb) { Net.mine = mergeMine(patch); Net.mine.r = Net.role === 'host' ? 'h' : 'g'; Net.mine.v = Net.V; Net.mine.id = Net.myId; Net.sbPush(); return Promise.resolve(); }
     if (!Net.nr) return Promise.resolve();
     // jaga agar objek presence gabungan tetap di bawah 4 KiB
-    var merged = Object.assign({}, Net.mine);
-    Object.keys(patch).forEach(function (k) { if (patch[k] === null) delete merged[k]; else merged[k] = patch[k]; });
+    var merged = mergeMine(patch);
     if (Net.bytes(merged) > Net.LIMIT) { fire('sendError', { code: 'too_big' }); return Promise.resolve(); }
     Net.mine = merged;
     try {
       return Net.nr.presence(patch).catch(function (e) { fire('sendError', e); });
     } catch (e) { return Promise.resolve(); }
   };
+  /* kiriman cepat saat laga (snapshot + event dari tuan rumah, masukan dari tamu).
+     Room claude.ai hanya punya presence, jadi ikut digabung di sana; Supabase & WiFi lokal memakai pesan kecil terpisah */
+  Net.sendFast = function (obj) {
+    if (Net.lan) { lanCast({ f: obj }); return Promise.resolve(); }
+    if (Net.sb) {
+      try { Net.sb.ch.send({ type: 'broadcast', event: 'f', payload: { id: Net.myId, r: Net.role === 'host' ? 'h' : 'g', d: obj } }); } catch (e) { fire('sendError', e); }
+      return Promise.resolve();
+    }
+    return Net.send(obj);
+  };
 
+  /* Keluar dari room. Kalau masih ada peserta lain, pamit dulu (st: 'bye') supaya mereka tahu ini sengaja dan tidak
+     menunggu sambungan kembali; sambungan lama ditutup sesaat kemudian agar kabar pamit sempat terkirim. */
+  Net.pendingClose = null;
+  Net.flushClose = function () { var f = Net.pendingClose; Net.pendingClose = null; if (f) f(); };
   Net.leave = function () {
     Net.unsubs.forEach(function (u) { try { u(); } catch (e) { /* abaikan */ } });
     Net.unsubs = [];
-    if (Net.nr) { try { Net.nr.leave(); } catch (e) { /* abaikan */ } }
-    Net.lanClose();
-    Net.sbLeave();
-    Net.nr = null; Net.role = null; Net.other = null; Net.otherPeer = null; Net.mine = {};
+    var nr = Net.nr, sb = Net.sb, lan = Net.lan;
+    var close = function () {
+      if (nr) { try { nr.leave(); } catch (e) { /* abaikan */ } }
+      lanCloseObj(lan);
+      sbClose(sb);
+    };
+    if ((nr || sb || lan) && Object.keys(Net.peers).length) {
+      try {
+        if (lan) lanCast({ p: { r: Net.mine.r, v: Net.V, st: 'bye' } });
+        else if (sb) sb.ch.send({ type: 'broadcast', event: 'p', payload: { r: Net.role === 'host' ? 'h' : 'g', v: Net.V, id: Net.myId, st: 'bye' } });
+        else { var pr = nr.presence({ st: 'bye', s: null, e: null, i: null, ack: null, cmd: null }); if (pr && pr.catch) pr.catch(function () { /* abaikan */ }); }
+      } catch (e) { /* abaikan */ }
+      Net.flushClose();
+      var tm = setTimeout(function () { if (Net.pendingClose === fin) Net.pendingClose = null; close(); }, 350);
+      var fin = function () { clearTimeout(tm); close(); };
+      Net.pendingClose = fin;
+    } else close();
+    Net.lan = null; Net.sb = null;
+    Net.nr = null; Net.role = null; Net.other = null; Net.otherPeer = null; Net.mine = {}; Net.peers = {}; Net.selfId = '';
   };
 
   /* ======================================================================
-     MODE WIFI LOKAL: WebRTC DataChannel antar dua HP di WiFi/hotspot yang sama, tanpa server & tanpa internet.
-     Kode sambungan (SDP) ditukar lewat QR, salin-tempel, atau WhatsApp.
+     MODE WIFI LOKAL: WebRTC DataChannel di WiFi/hotspot yang sama, tanpa server & tanpa internet.
+     Tuan rumah membuka satu sambungan per tamu (sampai 7); kode sambungan (SDP) ditukar lewat QR, salin-tempel, atau WhatsApp.
      ====================================================================== */
   Net.lan = null;
   Net.lanOk = function () { return typeof root.RTCPeerConnection === 'function'; };
@@ -237,70 +328,101 @@
       setTimeout(fin, 2500);
     });
   }
-  function lanSetup(role) {
-    Net.leave();
+  /* satu sambungan WebRTC. Tuan rumah: id tamu 'L1', 'L2', …; tamu: sambungannya ke tuan rumah ber-id 'host' */
+  function lanConn(lan, id) {
     var pc = new root.RTCPeerConnection({ iceServers: [] });
-    var lan = Net.lan = { pc: pc, role: role, dc: null, open: false, lastRx: 0 };
-    Net.role = role; Net.mine = {}; Net.other = null; Net.otherPeer = null; Net.lastOtherAt = 0;
+    var c = { pc: pc, dc: null, open: false, id: id, dead: false };
+    lan.conns.push(c);
+    var lost = function () {
+      if (Net.lan !== lan || c.dead) return;
+      var was = c.open;
+      c.dead = true; c.open = false;
+      lan.conns = lan.conns.filter(function (x) { return x !== c; });
+      if (lan.pending === c) lan.pending = null;
+      try { pc.close(); } catch (e) { /* abaikan */ }
+      if (was) peerDrop(c.id); else fire('error', { code: 'rtc-gagal' });
+    };
     pc.onconnectionstatechange = function () {
-      if (Net.lan !== lan) return;
       var st = pc.connectionState;
-      if (st === 'failed' || st === 'disconnected' || st === 'closed') { if (lan.open) { lan.open = false; Net.other = null; Net.otherPeer = null; fire('left', 'lan'); } else fire('error', { code: 'rtc-' + st }); }
+      if (st === 'failed' || st === 'disconnected' || st === 'closed') lost();
     };
-    return pc;
+    c.wire = function (dc) {
+      c.dc = dc;
+      dc.onopen = function () {
+        if (Net.lan !== lan || c.dead) return;
+        c.open = true; Net.connected = true; fire('conn', true);
+        if (lan.pending === c) lan.pending = null;
+        try {
+          if (lan.role === 'host') dc.send(JSON.stringify({ you: c.id }));
+          dc.send(JSON.stringify({ p: Net.mine }));
+        } catch (e) { /* abaikan */ }
+      };
+      dc.onmessage = function (ev) {
+        if (Net.lan !== lan || c.dead) return;
+        var o; try { o = JSON.parse(ev.data); } catch (e) { return; }
+        if (!o || typeof o !== 'object') return;
+        var role = lan.role === 'host' ? 'g' : 'h';
+        if (typeof o.you === 'string' && lan.role === 'guest') Net.selfId = o.you;
+        if (o.p && typeof o.p === 'object') peerSet(c.id, role, o.p);
+        else if (o.f && typeof o.f === 'object') peerSet(c.id, role, o.f, true);
+      };
+      dc.onclose = function () { lost(); };
+    };
+    return c;
   }
-  function wireDc(dc) {
-    var lan = Net.lan; lan.dc = dc;
-    dc.onopen = function () {
-      if (Net.lan !== lan) return;
-      lan.open = true; Net.otherPeer = 'lan'; Net.connected = true; fire('conn', true);
-      try { dc.send(JSON.stringify({ p: Net.mine })); } catch (e) { /* abaikan */ }
-      fire('joined', { peer: 'lan' });
-    };
-    dc.onmessage = function (ev) {
-      if (Net.lan !== lan) return;
-      var o; try { o = JSON.parse(ev.data); } catch (e) { return; }
-      if (!o || typeof o !== 'object') return;
-      if (o.p) { Net.other = o.p; Net.lastOtherAt = Date.now(); lan.lastRx = Date.now(); fire('presence', o.p); }
-    };
-    dc.onclose = function () { if (Net.lan === lan && lan.open) { lan.open = false; Net.other = null; Net.otherPeer = null; fire('left', 'lan'); } };
+  function lanCast(msg) {
+    var lan = Net.lan; if (!lan) return;
+    var txt;
+    try { txt = JSON.stringify(msg); } catch (e) { return; }
+    lan.conns.forEach(function (c) { if (c.open && c.dc && c.dc.readyState === 'open') { try { c.dc.send(txt); } catch (e) { fire('sendError', e); } } });
   }
-  /* tuan rumah: buat kode undangan */
+  function lanStart(role) {
+    Net.leave(); Net.flushClose();
+    Net.lan = { role: role, conns: [], pending: null, n: 0 };
+    Net.role = role; Net.mine = {}; Net.peers = {}; Net.other = null; Net.otherPeer = null; Net.lastOtherAt = 0; Net.selfId = role === 'host' ? 'host' : '';
+    return Net.lan;
+  }
+  Net.lanOpenCount = function () { return Net.lan ? Net.lan.conns.filter(function (c) { return c.open; }).length : 0; };
+  /* tuan rumah: buat kode undangan untuk SATU tamu berikutnya (sambungan tamu lain tetap hidup) */
   Net.lanOffer = function () {
     if (!Net.lanOk()) return Promise.reject({ code: 'no-webrtc' });
-    var pc = lanSetup('host');
-    wireDc(pc.createDataChannel('bola', { ordered: true }));
-    return pc.createOffer().then(function (o) { return pc.setLocalDescription(o); }).then(function () { return waitIce(pc); }).then(function () { return packSdp(pc.localDescription); });
+    var lan = (Net.lan && Net.lan.role === 'host') ? Net.lan : lanStart('host');
+    if (lan.conns.filter(function (c) { return c.open; }).length >= Net.MAX_GUESTS) return Promise.reject({ code: 'penuh' });
+    if (lan.pending) { var old = lan.pending; lan.pending = null; old.dead = true; lan.conns = lan.conns.filter(function (x) { return x !== old; }); try { old.pc.close(); } catch (e) { /* abaikan */ } }
+    var c = lanConn(lan, 'L' + (++lan.n));
+    lan.pending = c;
+    c.wire(c.pc.createDataChannel('bola', { ordered: true }));
+    return c.pc.createOffer().then(function (o) { return c.pc.setLocalDescription(o); }).then(function () { return waitIce(c.pc); }).then(function () { return packSdp(c.pc.localDescription); });
   };
   /* tamu: terima kode undangan, hasilkan kode balasan */
   Net.lanAnswer = function (offerStr) {
     if (!Net.lanOk()) return Promise.reject({ code: 'no-webrtc' });
     var desc = unpackSdp(offerStr);
     if (!desc || desc.type !== 'offer') return Promise.reject({ code: 'bad-offer' });
-    var pc = lanSetup('guest');
-    pc.ondatachannel = function (e) { wireDc(e.channel); };
-    return pc.setRemoteDescription(desc).then(function () { return pc.createAnswer(); }).then(function (a) { return pc.setLocalDescription(a); }).then(function () { return waitIce(pc); }).then(function () { return packSdp(pc.localDescription); });
+    var lan = lanStart('guest');
+    var c = lanConn(lan, 'host');
+    c.pc.ondatachannel = function (e) { c.wire(e.channel); };
+    return c.pc.setRemoteDescription(desc).then(function () { return c.pc.createAnswer(); }).then(function (a) { return c.pc.setLocalDescription(a); }).then(function () { return waitIce(c.pc); }).then(function () { return packSdp(c.pc.localDescription); });
   };
-  /* tuan rumah: terima kode balasan tamu */
+  /* tuan rumah: terima kode balasan tamu untuk undangan yang sedang menunggu */
   Net.lanAccept = function (answerStr) {
     var desc = unpackSdp(answerStr);
-    if (!Net.lan || Net.lan.role !== 'host') return Promise.reject({ code: 'no-host' });
+    if (!Net.lan || Net.lan.role !== 'host' || !Net.lan.pending) return Promise.reject({ code: 'no-host' });
     if (!desc || desc.type !== 'answer') return Promise.reject({ code: 'bad-answer' });
-    return Net.lan.pc.setRemoteDescription(desc);
+    return Net.lan.pending.pc.setRemoteDescription(desc);
   };
-  Net.lanSend = function (patch) {
-    var lan = Net.lan; if (!lan) return Promise.resolve();
-    var merged = Object.assign({}, Net.mine);
-    Object.keys(patch).forEach(function (k) { if (patch[k] === null) delete merged[k]; else merged[k] = patch[k]; });
-    Net.mine = merged;
-    if (lan.open && lan.dc && lan.dc.readyState === 'open') { try { lan.dc.send(JSON.stringify({ p: merged })); } catch (e) { fire('sendError', e); } }
-    return Promise.resolve();
-  };
+  function lanCloseObj(lan) {
+    if (!lan) return;
+    lan.conns.forEach(function (c) {
+      c.dead = true;
+      try { if (c.dc) c.dc.close(); } catch (e) { /* abaikan */ }
+      try { c.pc.close(); } catch (e2) { /* abaikan */ }
+    });
+  }
   Net.lanClose = function () {
     var lan = Net.lan; if (!lan) return;
     Net.lan = null;
-    try { if (lan.dc) lan.dc.close(); } catch (e) { /* abaikan */ }
-    try { lan.pc.close(); } catch (e2) { /* abaikan */ }
+    lanCloseObj(lan);
   };
 
   /* ---------- QR ---------- */
@@ -425,7 +547,8 @@
   /* bagikan tautan room (WhatsApp dll.) lewat Web Share, atau salin ke papan klip */
   Net.shareLink = function (code) {
     var url = Net.qrText(code);
-    var text = 'Ayo tanding Bola Api Arena! Buka tautan ini lalu tekan Gabung: ' + url + ' (kode room ' + String(code).toUpperCase() + ')';
+    var Tt = function (s) { return BA.t ? BA.t.apply(null, arguments) : s; };
+    var text = Tt('Ayo tanding Bola Api Arena! Buka tautan ini lalu tekan Gabung: {0}', url) + ' (' + Tt('kode room {0}', String(code).toUpperCase()) + ')';
     return new Promise(function (resolve) {
       if (navigator.share) {
         try { navigator.share({ title: 'Bola Api Arena', text: text, url: url }).then(function () { resolve('shared'); }, function () { copy(); }); return; } catch (e) { /* lanjut salin */ }
@@ -444,9 +567,12 @@
   };
 
   /* ---------- event yang diteruskan ke tamu ---------- */
-  var SEND_KINDS = { whistle: 1, kick: 1, pass: 1, tackle: 1, slide: 1, gocek: 1, cine: 1, goal: 1, save: 1, post: 1, miss: 1, say: 1, hot: 1, petir: 1, corner: 1, penalty: 1, shootout: 1, penres: 1, end: 1, golden: 1, restart: 1, kickoffFirst: 1, offside: 1, foul: 1, card: 1 };
+  var SEND_KINDS = { whistle: 1, kick: 1, pass: 1, tackle: 1, slide: 1, gocek: 1, cine: 1, goal: 1, save: 1, post: 1, miss: 1, say: 1, hot: 1, petir: 1, corner: 1, penalty: 1, shootout: 1, penres: 1, end: 1, golden: 1, restart: 1, kickoffFirst: 1, offside: 1, foul: 1, card: 1,
+    half: 1, backpass: 1, strike: 1, block: 1, injury: 1, sub: 1, teamset: 1 };
+  /* event yang wajib sampai walau kiriman dipangkas karena batas ukuran */
+  var MUST = { cine: 1, goal: 1, end: 1, penres: 1, sub: 1 };
   Net.HostLink = function (sim, mid) {
-    this.sim = sim; this.mid = mid; this.ring = []; this.lastSend = 0; this.lastIn = null; this.ackId = 0;
+    this.sim = sim; this.mid = mid; this.ring = []; this.lastSend = 0; this.acks = {}; this.cmdSeq = {}; this.fitAt = 0; this.onCmd = null;
   };
   Net.HostLink.prototype.feed = function (events) {
     var self = this;
@@ -456,69 +582,114 @@
       Object.keys(e).forEach(function (key) { if (key !== 'id' && key !== 'k') o[key] = e[key]; });
       self.ring.push(o);
     });
-    if (this.ring.length > 14) this.ring.splice(0, this.ring.length - 14);
+    if (this.ring.length > 18) this.ring.splice(0, this.ring.length - 18);
+  };
+  /* id event terakhir yang sudah diterima SEMUA tamu yang masih tersambung */
+  Net.HostLink.prototype.minAck = function () {
+    var g = Net.guestPeers(), m = null, self = this;
+    g.forEach(function (p) { var a = self.acks[p.id] || 0; if (m === null || a < m) m = a; });
+    return m === null ? 0 : m;
   };
   Net.HostLink.prototype.tick = function (nowMs, extra) {
-    if (nowMs - this.lastSend < (Net.transport === 'sb' ? 80 : 66)) return;
+    var gap = Net.lan ? 50 : (Net.transport === 'sb' ? (Net.guestPeers().length > 2 ? 100 : 80) : 66);
+    if (nowMs - this.lastSend < gap) return;
     this.lastSend = nowMs;
-    var ack = this.ackId;
+    var ack = this.minAck();
     var ev = this.ring.filter(function (e) { return e.id > ack; });
-    var patch = { st: 'play', mid: this.mid, s: this.sim.snapshot(), e: ev };
+    var withFit = nowMs - this.fitAt > 1000;
+    if (withFit) this.fitAt = nowMs;
+    var patch = { st: 'play', mid: this.mid, s: this.sim.snapshot(withFit), e: ev };
     if (extra) Object.keys(extra).forEach(function (k) { patch[k] = extra[k]; });
-    // ukur objek gabungan (tim + aturan + snapshot + event)
-    var full = Object.assign({}, Net.mine, patch);
-    if (Net.bytes(full) > Net.LIMIT) {
-      patch.e = ev.filter(function (e) { return e.k === 'cine' || e.k === 'goal' || e.k === 'end' || e.k === 'penres'; }).slice(-3);
-      full.e = patch.e;
-      if (Net.bytes(full) > Net.LIMIT) { patch.e = ev.filter(function (e) { return e.k === 'end' || e.k === 'cine'; }).slice(-1); full.e = patch.e; }
-      if (Net.bytes(full) > Net.LIMIT) { patch.e = []; }
+    if (!Net.lan && !Net.sb) {
+      // room claude.ai: ukur objek presence gabungan (daftar pemain + aturan + snapshot + event) terhadap batas 4 KiB
+      var full = Object.assign({}, Net.mine, patch);
+      if (Net.bytes(full) > Net.LIMIT) {
+        patch.e = ev.filter(function (e) { return MUST[e.k]; }).slice(-3);
+        full.e = patch.e;
+        if (Net.bytes(full) > Net.LIMIT) { patch.e = ev.filter(function (e) { return e.k === 'end' || e.k === 'cine'; }).slice(-1); full.e = patch.e; }
+        if (Net.bytes(full) > Net.LIMIT) { patch.e = []; }
+      }
     }
-    Net.send(patch);
+    Net.sendFast(patch);
   };
-  Net.HostLink.prototype.readGuest = function (pres) {
+  /* baca masukan satu tamu (pres = keadaan terakhirnya); id = id peserta untuk catatan ack & perintah */
+  Net.HostLink.prototype.readGuest = function (pres, id) {
     if (!pres) return null;
-    if (Array.isArray(pres.ack) && pres.ack[0] === this.mid && typeof pres.ack[1] === 'number') this.ackId = Math.max(this.ackId, pres.ack[1]);
+    id = id || '_';
+    if (Array.isArray(pres.ack) && pres.ack[0] === this.mid && typeof pres.ack[1] === 'number') this.acks[id] = Math.max(this.acks[id] || 0, pres.ack[1]);
+    /* perintah kapten (formasi, pergantian): [mid, nomor urut terakhir, [[nomor, perintah], …]] — tiap nomor dijalankan sekali */
+    if (Array.isArray(pres.cmd) && pres.cmd[0] === this.mid && Array.isArray(pres.cmd[2])) {
+      var list = pres.cmd[2], done = this.cmdSeq[id] || 0;
+      for (var ci = 0; ci < list.length && ci < 8; ci++) {
+        var it = list[ci];
+        if (!Array.isArray(it) || typeof it[0] !== 'number' || it[0] <= done || !it[1] || typeof it[1] !== 'object') continue;
+        done = it[0];
+        if (this.onCmd) this.onCmd(id, it[1]);
+      }
+      this.cmdSeq[id] = done;
+    }
     var a = pres.i;
     if (!Array.isArray(a)) return null;
     return {
       mx: U.num(a[0], 0) / 100, mz: U.num(a[1], 0) / 100, sprint: !!a[2], passSeq: a[3] | 0, gocekSeq: a[4] | 0, switchSeq: a[5] | 0,
       shootHeld: !!a[6], shootSeq: a[7] | 0, charge: U.num(a[8], 0) / 100, zc: a[9] | 0, zr: a[10] | 0, skipSeq: a[11] | 0, chase: !!a[12],
-      passCharge: U.num(a[13], 0) / 100, lobSeq: a[14] | 0, lobCharge: U.num(a[15], 0) / 100
+      passCharge: U.num(a[13], 0) / 100, lobSeq: a[14] | 0, lobCharge: U.num(a[15], 0) / 100,
+      longSeq: a[16] | 0, longCharge: U.num(a[17], 0) / 100, chipSeq: a[18] | 0, chipCharge: U.num(a[19], 0) / 100, easy: !!a[20]
     };
   };
   Net.packInput = function (inp) {
     return [Math.round(inp.mx * 100), Math.round(inp.mz * 100), inp.sprint ? 1 : 0, inp.passSeq, inp.gocekSeq, inp.switchSeq, inp.shootHeld ? 1 : 0, inp.shootSeq, Math.round(inp.charge * 100), inp.zc, inp.zr, inp.skipSeq, inp.chase ? 1 : 0,
-      Math.round((inp.passCharge || 0) * 100), inp.lobSeq | 0, Math.round((inp.lobCharge || 0) * 100)];
+      Math.round((inp.passCharge || 0) * 100), inp.lobSeq | 0, Math.round((inp.lobCharge || 0) * 100),
+      inp.longSeq | 0, Math.round((inp.longCharge || 0) * 100), inp.chipSeq | 0, Math.round((inp.chipCharge || 0) * 100), inp.easy ? 1 : 0];
   };
 
   /* ---------- tampilan jarak jauh (tamu) ---------- */
+  var ROLE_IDS = ['GK', 'DF', 'MF', 'FW'];
   var RemoteView = BA.RemoteView = function (cfg) {
     this.cfg = cfg;
     D.useField(cfg.field);
     this.field = D.FIELD.id; this.n = D.FIELD.n;
-    this.teams = D.resolveKits(D.sanitizeTeam(cfg.teams[0]), D.sanitizeTeam(cfg.teams[1]));
+    this.teams = D.resolveKits(D.matchTeam(cfg.teams[0], this.field), D.matchTeam(cfg.teams[1], this.field));
     this.rules = Object.assign(D.defaultRules(), cfg.rules || {});
     this.mode = cfg.mode || 'match';
     this.arena = D.arenaById[cfg.arena] || D.ARENAS[0];
     this.weather = D.weatherById[cfg.weather] || D.WEATHERS[0];
+    if (this.arena.indoor) this.weather = D.WEATHERS[0];
     this.ballDef = D.ballById[cfg.ball] || D.BALLS[0];
     this.players = [];
-    for (var t = 0; t < 2; t++) for (var i = 0; i < this.n; i++) {
-      var c = this.teams[t].players[i];
-      this.players.push({ team: t, idx: i, cfg: c, role: c.role, name: c.name, num: c.num, shot: D.shotById[c.shot] || D.SHOTS[0], style: D.styleById[c.style] || D.STYLES[0],
-        x: 0, z: 0, facing: 0, anim: 'idle', animT: 0, hidden: false, gkHold: false, celebrate: false, st: D.playerStats(c, this.teams[t].level) });
+    for (var t = 0; t < 2; t++) {
+      var slots = D.formSlots(this.n, this.teams[t].form, this.teams[t].players);
+      for (var i = 0; i < this.n; i++) {
+        var c = this.teams[t].players[i];
+        this.players.push({ team: t, idx: i, cfg: c, role: (slots[i] && slots[i].role) || c.role, name: c.name, num: c.num, shot: D.shotById[c.shot] || D.SHOTS[0], style: D.styleById[c.style] || D.STYLES[0],
+          x: 0, z: 0, facing: 0, anim: 'idle', animT: 0, hidden: false, gkHold: false, celebrate: false, st: D.playerStats(c, this.teams[t].level),
+          energy: 100, stamina: 100, injured: false, diveSide: 0, slotIdx: i, slot: slots[i] || { fx: 0.4, fz: 0 } });
+      }
     }
     this.ball = { x: 0, y: 0.13, z: 0, owner: null, petirT: 0, holdT: 0, vx: 0, vz: 0 };
     this.score = [0, 0]; this.sem = [0, 0]; this.clock = this.rules.dur; this.phase = 'kickoff'; this.timeScale = 1;
     this.active = [null, null]; this.aim = null; this.pen = null; this.shootout = null; this.revealed = [{}, {}]; this.corners = [0, 0];
-    this.golden = false; this.winner = -1; this.goalTeam = -1; this.half = 1; this.swap = false; this.coop = !!cfg.coop; this.active2 = null;
+    this.golden = false; this.winner = -1; this.goalTeam = -1; this.half = 1; this.swap = false; this.coop = false; this.active2 = null;
     this.buf = []; this.lastEv = 0; this.renderHt = null; this.got = false; this.lastRecv = 0;
-    this.humans = this.coop ? [true, false] : [true, true];
+    /* kursi: tim tiap pengendali manusia (dari tuan rumah) */
+    var st = Array.isArray(cfg.seats) ? cfg.seats : [0, 1];
+    this.seats = st.map(function (tm) { return (tm === 0 || tm === 1) ? { team: tm, p: null } : null; });
+    this.humans = [this.seats.some(function (s) { return s && s.team === 0; }), this.seats.some(function (s) { return s && s.team === 1; })];
+    var n = this.n, self = this;
+    this.subsLeft = [D.MAX_SUBS, D.MAX_SUBS];
+    this.bench = [0, 1].map(function (tt) { var out = []; for (var j = 0; j < D.BENCH; j++) if (self.teams[tt].players[n + j]) out.push({ i: n + j, used: false }); return out; });
   };
   RemoteView.prototype.dirOf = function (team) { return (team === 0 ? 1 : -1) * (this.swap ? -1 : 1); };
   RemoteView.prototype.pl = function (t, i) { return (i >= 0 && i < this.n) ? (this.players[t * this.n + i] || null) : null; };
+  RemoteView.prototype.code = function (p) { return p ? p.team * this.n + p.idx : -1; };
   RemoteView.prototype.oppGoalX = function (team) { return this.dirOf(team) * D.FIELD.L / 2; };
   RemoteView.prototype.inShotRange = function (p) { var F = D.FIELD; return U.dist(p.x, p.z, this.oppGoalX(p.team), 0) < F.shot && Math.abs(p.z) < Math.max(12.5, F.boxW / 2 + 4); };
+  RemoteView.prototype.strikeRange = Sim ? Sim.prototype.strikeRange : function () { return 0; };
+  RemoteView.prototype.seatP = function (si) { var s = this.seats[si]; return s ? s.p : null; };
+  RemoteView.prototype.seatOf = function (p) { if (!p) return -1; for (var i = 0; i < this.seats.length; i++) if (this.seats[i] && this.seats[i].p === p) return i; return -1; };
+  RemoteView.prototype.teamSeats = function (team) { var out = []; for (var i = 0; i < this.seats.length; i++) if (this.seats[i] && this.seats[i].team === team) out.push(i); return out; };
+  RemoteView.prototype.isCtl = function (p) { return this.seatOf(p) >= 0; };
+  RemoteView.prototype.penSeat = function (pen) { return pen && typeof pen.seat === 'number' ? pen.seat : -1; };
 
   RemoteView.prototype.push = function (s, nowMs) {
     if (!s || s.v !== 1 || !Array.isArray(s.p) || s.p.length < this.n * 10 || !Array.isArray(s.b)) return;
@@ -542,7 +713,8 @@
     this.score = [s.sc[0] | 0, s.sc[1] | 0];
     this.sem = [U.num(s.se[0], 0), U.num(s.se[1], 0)];
     this.active = [s.ac[0] >= 0 ? this.pl(0, s.ac[0]) : null, s.ac[1] >= 0 ? this.pl(1, s.ac[1]) : null];
-    var n2 = this.n * 2;
+    var n2 = this.n * 2, i;
+    if (Array.isArray(s.cp)) for (i = 0; i < this.seats.length; i++) { if (this.seats[i]) this.seats[i].p = (s.cp[i] >= 0 && s.cp[i] < n2) ? this.players[s.cp[i]] : null; }
     this.aim = (s.am >= 0 && s.am < n2) ? { p: this.players[s.am], team: Math.floor(s.am / this.n) } : null;
     this.ball.owner = s.b[3] >= 0 && s.b[3] < n2 ? this.players[s.b[3]] : null;
     this.ball.petirT = s.b[4] ? 1 : 0;
@@ -552,9 +724,8 @@
     this.winner = U.num(s.wn, -1);
     this.goalTeam = U.num(s.gt, -1);
     this.half = U.num(s.hf, 1); this.swap = !!s.sw;
-    this.active2 = (s.a2 >= 0 && s.a2 < this.n) ? this.pl(0, s.a2) : null;
     if (Array.isArray(s.pn)) {
-      this.pen = { state: Sim.PEN_STATES[s.pn[0]] || 'setup', team: s.pn[1] | 0, kind: ['single', 'shootout', 'practice'][s.pn[2]] || 'single', shooter: this.pl(s.pn[1] | 0, s.pn[3] | 0) };
+      this.pen = { state: Sim.PEN_STATES[s.pn[0]] || 'setup', team: s.pn[1] | 0, kind: ['single', 'shootout', 'practice'][s.pn[2]] || 'single', shooter: this.pl(s.pn[1] | 0, s.pn[3] | 0), seat: typeof s.pn[4] === 'number' ? s.pn[4] : -1 };
     } else this.pen = null;
     if (Array.isArray(s.so)) {
       var k0 = String(s.so[0] || '').split('').map(Number), k1 = String(s.so[1] || '').split('').map(Number);
@@ -566,12 +737,45 @@
       String(s.rv[t] || '').split(',').forEach(function (z) { if (z && k && k.style.map[z]) map[z] = k.style.map[z]; });
       self.revealed[t] = map;
     });
-    for (var i = 0; i < n2; i++) {
+    for (i = 0; i < n2; i++) {
       var p = this.players[i], f = s.p[i * 5 + 4] | 0;
       var an = Sim.ANIMS[s.p[i * 5 + 3] | 0] || 'idle';
       if (an !== p.anim) { p.anim = an; p.animT = 0; }
       p.hidden = !!(f & 1); p.gkHold = !!(f & 2); p.celebrate = !!(f & 4); p.throwIn = !!(f & 8); p.sprint = !!(f & 16);
+      p.diveSide = (f & 32) ? 1 : ((f & 64) ? -1 : 0); p.injured = !!(f & 128);
     }
+    if (s.fit && typeof s.fit === 'object') this.applyFit(s.fit);
+  };
+  /* kebugaran, slot/peran, formasi, taktik, sisa pergantian (dikirim tuan rumah ±1× per detik) */
+  RemoteView.prototype.applyFit = function (ft) {
+    var n2 = this.n * 2, tacs = D.TACTICS, self = this, i;
+    if (Array.isArray(ft.e)) for (i = 0; i < n2; i++) if (typeof ft.e[i] === 'number') { this.players[i].energy = U.clamp(ft.e[i], 0, 100); this.players[i].stamina = this.players[i].energy; }
+    if (Array.isArray(ft.s)) for (i = 0; i < n2; i++) if (typeof ft.s[i] === 'number') this.players[i].slotIdx = U.clamp(ft.s[i] | 0, 0, this.n - 1);
+    if (Array.isArray(ft.r)) for (i = 0; i < n2; i++) if (ROLE_IDS[ft.r[i]]) this.players[i].role = ROLE_IDS[ft.r[i]];
+    [0, 1].forEach(function (t) {
+      var team = self.teams[t];
+      if (Array.isArray(ft.f)) { var fo = ft.f[t]; if (fo && D.formById(self.n, fo)) team.form = fo; else delete team.form; }
+      if (Array.isArray(ft.tc) && tacs[ft.tc[t]]) team.tactic = tacs[ft.tc[t]].id;
+      if (Array.isArray(ft.su) && typeof ft.su[t] === 'number') self.subsLeft[t] = U.clamp(ft.su[t] | 0, 0, D.MAX_SUBS);
+      if (Array.isArray(ft.bn) && Array.isArray(ft.bn[t])) self.bench[t].forEach(function (b, j) { b.used = !!ft.bn[t][j]; });
+      if (Array.isArray(ft.au)) team.autoSub = !!ft.au[t];
+      var slots = D.formSlots(self.n, team.form, team.players);
+      self.players.forEach(function (p) { if (p.team === t && slots[p.slotIdx]) p.slot = slots[p.slotIdx]; });
+    });
+  };
+  /* event pergantian pemain dari tuan rumah: tukar di daftar tim & perbarui pemain di lapangan */
+  RemoteView.prototype.applySub = function (e) {
+    var t = e.team | 0, team = this.teams[t], p = this.pl(t, e.idx | 0), bi = e.bi | 0;
+    if (!team || !p || !team.players[bi] || bi < this.n) return false;
+    if (team.players[bi].name !== e.on && p.name === e.on) return false; /* sudah diterapkan */
+    var old = team.players[p.idx], nw = team.players[bi];
+    team.players[p.idx] = nw; team.players[bi] = old;
+    p.cfg = nw; p.name = nw.name; p.num = nw.num; p.st = D.playerStats(nw, team.level);
+    p.shot = D.shotById[nw.shot] || D.SHOTS[0]; p.style = D.styleById[nw.style] || D.STYLES[0];
+    p.energy = 100; p.injured = false;
+    var b = this.bench[t][e.j | 0]; if (b) b.used = true;
+    if (typeof e.left === 'number') this.subsLeft[t] = e.left;
+    return true;
   };
 
   /* interpolasi posisi */
@@ -613,7 +817,7 @@
     void nowMs;
   };
 
-  /* ambil event baru dari presence tuan rumah */
+  /* ambil event baru dari kiriman tuan rumah */
   RemoteView.prototype.newEvents = function (list) {
     var out = [], self = this;
     if (!Array.isArray(list)) return out;

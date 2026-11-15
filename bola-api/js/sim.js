@@ -8,13 +8,15 @@
 
   var ANIMS = ['idle', 'run', 'kick', 'tackle', 'stun', 'celebrate', 'gkReady', 'gkHold', 'gkDive', 'aim', 'throw', 'sad', 'shoot', 'pass', 'slide', 'throwin', 'punt', 'cheer'];
   /* lama animasi aksi ditahan sebelum kembali ke lari/diam */
-  var HOLD = { kick: 0.32, shoot: 0.45, pass: 0.3, throw: 0.42, punt: 0.5, throwin: 0.42, tackle: 0.36 };
+  var HOLD = { kick: 0.32, shoot: 0.45, pass: 0.3, throw: 0.42, punt: 0.5, throwin: 0.42, tackle: 0.36, gkDive: 0.55 };
   var PHASES = ['kickoff', 'play', 'cine', 'goal', 'restart', 'pen', 'end'];
   var PEN_STATES = ['setup', 'aim', 'cine', 'after', 'done'];
 
   function blankInput() {
-    return { mx: 0, mz: 0, sprint: false, passSeq: 0, gocekSeq: 0, switchSeq: 0, shootHeld: false, shootSeq: 0, charge: 0, zc: 0, zr: 1, skipSeq: 0, chase: false, passCharge: 0, lobSeq: 0, lobCharge: 0 };
+    return { mx: 0, mz: 0, sprint: false, passSeq: 0, gocekSeq: 0, switchSeq: 0, shootHeld: false, shootSeq: 0, charge: 0, zc: 0, zr: 1, skipSeq: 0, chase: false, passCharge: 0, lobSeq: 0, lobCharge: 0,
+      longSeq: 0, longCharge: 0, chipSeq: 0, chipCharge: 0, easy: false };
   }
+  function blankHs() { return { passSeq: 0, gocekSeq: 0, switchSeq: 0, shootSeq: 0, shootHeld: false, skipSeq: 0, lobSeq: 0, longSeq: 0, chipSeq: 0 }; }
 
   var Sim = BA.Sim = function (cfg) {
     cfg = cfg || {};
@@ -29,12 +31,12 @@
     this.arena = D.arenaById[cfg.arena] || D.ARENAS[0];
     this.weather = D.weatherById[cfg.weather] || D.WEATHERS[0];
     this.ballDef = D.ballById[cfg.ball] || D.BALLS[0];
-    this.humans = cfg.humans || [true, false];
-    /* co-op: dua pemain manusia di tim 0 (masukan ke-2 = inputs[1]), lawan dikendalikan AI */
+    if (this.arena.indoor) this.weather = D.WEATHERS[0]; /* dalam ruangan: cuaca tidak berpengaruh */
+    /* kursi pengendali manusia (sampai 8): lihat initSeats di sim2.js. co-op lama = kursi 0 & 1 sama-sama di tim 0 */
     this.coop = !!cfg.coop;
-    if (this.coop) this.humans = [true, false];
+    this.initSeats(cfg);
     this.active2 = null;
-    this.teams = D.resolveKits(D.sanitizeTeam(cfg.teams && cfg.teams[0]), D.sanitizeTeam(cfg.teams && cfg.teams[1]));
+    this.teams = D.resolveKits(D.matchTeam(cfg.teams && cfg.teams[0], F.id), D.matchTeam(cfg.teams && cfg.teams[1], F.id));
     this.t = 0; this.realT = 0; this.acc = 0;
     this.clock = this.rules.dur;
     this.score = [0, 0];
@@ -44,9 +46,10 @@
     this.phase = 'kickoff'; this.phaseT = 0;
     this.timeScale = 1; this.tsTarget = 1;
     this.players = [];
-    this.ball = { x: 0, y: R, z: 0, vx: 0, vy: 0, vz: 0, owner: null, last: null, holdT: 0, petirT: 0, pass: null, noTouch: null, noTouchT: 0, stuckT: 0, inNet: 0 };
-    this.inputs = [blankInput(), blankInput()];
-    this.hs = [{ passSeq: 0, gocekSeq: 0, switchSeq: 0, shootSeq: 0, shootHeld: false, skipSeq: 0, lobSeq: 0 }, { passSeq: 0, gocekSeq: 0, switchSeq: 0, shootSeq: 0, shootHeld: false, skipSeq: 0, lobSeq: 0 }];
+    this.ball = { x: 0, y: R, z: 0, vx: 0, vy: 0, vz: 0, owner: null, last: null, holdT: 0, petirT: 0, pass: null, noTouch: null, noTouchT: 0, stuckT: 0, inNet: 0, shot: null };
+    this.inputs = this.seats.map(blankInput);
+    this.hs = this.seats.map(blankHs);
+    this.inPrimed = this.seats.map(function () { return false; });
     this.active = [null, null];
     this.swT = [0, 0];
     this.aim = null;
@@ -70,6 +73,7 @@
     this.sanityFails = 0;
     this.restartDelay = 0.9;
     this.buildPlayers();
+    this.initBench();
     if (this.mode === 'match') { this.setupKickoff(this.rng() < 0.5 ? 0 : 1, true); }
     else if (this.mode === 'penalty') { this.startShootout(true); }
     else if (this.mode === 'practice') { this.startPractice(); }
@@ -80,6 +84,8 @@
   Sim.PEN_STATES = PEN_STATES;
   Sim.HOLD = HOLD;
   Sim.blankInput = blankInput;
+  Sim.blankHs = blankHs;
+  Sim.R = R;
   var S = Sim.prototype;
 
   S.blankStats = function () { return { shots: 0, onTarget: 0, goals: 0, saves: 0, special: 0, tackles: 0, passes: 0, best: 0, offsides: 0, fouls: 0 }; };
@@ -104,15 +110,15 @@
     var n = this.n;
     for (var t = 0; t < 2; t++) {
       var team = this.teams[t];
-      var slots = D.formation(team.players.slice(0, n));
+      var slots = D.formSlots(n, team.form, team.players);
       for (var i = 0; i < n; i++) {
         var c = team.players[i];
         var p = {
-          team: t, idx: i, cfg: c, role: c.role, name: c.name, num: c.num,
+          team: t, idx: i, cfg: c, role: (slots[i] && slots[i].role) || c.role, name: c.name, num: c.num, slotIdx: i,
           st: D.playerStats(c, team.level), shot: D.shotById[c.shot] || D.SHOTS[0], style: D.styleById[c.style] || D.STYLES[0],
           x: 0, z: 0, vx: 0, vz: 0, dvx: 0, dvz: 0, facing: t === 0 ? Math.PI / 2 : -Math.PI / 2,
           anim: 'idle', animT: 0, stunT: 0, kickCD: 0, tackleCD: 0, gocekT: 0, gocekCD: 0, slideT: 0, slid: false,
-          stamina: 100, sprint: false, aiT: this.rng() * 0.2, recvAt: -9, fromPass: false, gkHold: false, gkHoldT: 0,
+          stamina: 100, energy: 100, injured: false, diveSide: 0, sprint: false, aiT: this.rng() * 0.2, recvAt: -9, fromPass: false, gkHold: false, gkHoldT: 0,
           hidden: false, slot: slots[i] || { fx: 0.4, fz: 0 }, celebrate: false, tackled: null, wantSprint: false
         };
         if (t === 1 && this.mode === 'practice' && this.cfg.practiceStyle && i === 0) p.style = D.styleById[this.cfg.practiceStyle] || p.style;
@@ -124,9 +130,11 @@
 
   S.maxSpeed = function (p, sprint) {
     var v = (4.85 + (p.st.lari - 50) * 0.05) * (1 + (F.ss - 1) * 0.25);
-    if (sprint && p.stamina > 8) v *= 1.4;
+    if (sprint && p.stamina > 8 && !p.injured) v *= 1.4;
     if (this.ball.owner === p) v *= 0.9 * (0.9 + 0.1 * D.bv(this.ballDef, 'ctrl'));
     if (p.stamina < 12) v *= 0.86;
+    if (p.energy < 50) v *= 0.88 + 0.12 * Math.max(0, p.energy) / 50; /* lelah jangka panjang */
+    if (p.injured) v *= 0.74;
     if (p.gocekT > 0.2) v *= 1.22;
     if (p.role === 'GK') v = Math.max(v, 5.6);
     return v;
@@ -157,10 +165,10 @@
     var self = this, b = this.ball;
     this.phase = 'kickoff'; this.phaseT = 0; this.kickTeam = team;
     this.aim = null; this.tsTarget = 1; this.timeScale = 1;
-    b.x = 0; b.z = 0; b.y = R; b.vx = b.vy = b.vz = 0; b.owner = null; b.pass = null; b.holdT = 0; b.inNet = 0; b.noTouch = null; b.stuckT = 0; b.last = null;
+    b.x = 0; b.z = 0; b.y = R; b.vx = b.vy = b.vz = 0; b.owner = null; b.pass = null; b.holdT = 0; b.inNet = 0; b.noTouch = null; b.stuckT = 0; b.last = null; b.shot = null;
     var kicker = null;
     this.players.forEach(function (p) {
-      p.vx = p.vz = p.dvx = p.dvz = 0; p.stunT = 0; p.slideT = 0; p.gkHold = false; p.celebrate = false; p.anim = 'idle'; p.kickCD = 0; p.throwIn = false;
+      p.vx = p.vz = p.dvx = p.dvz = 0; p.stunT = 0; p.slideT = 0; p.gkHold = false; p.celebrate = false; p.anim = 'idle'; p.kickCD = 0; p.throwIn = false; p.diveSide = 0;
       if (p.hidden) return;
       var dir = self.dirOf(p.team);
       var fx = Math.min(p.slot.fx, 0.42);
@@ -176,7 +184,7 @@
     kicker.x = -dir * 0.55; kicker.z = 0; kicker.facing = Math.atan2(dir, 0);
     if (cands[1]) { cands[1].x = -dir * 3.5 * F.ss; cands[1].z = (cands[1].slot.fz >= 0 ? 4 : -4) * F.ss; }
     this.kicker = kicker;
-    if (this.humans[team]) { this.active[team] = kicker; if (this.coop && team === 0 && this.active2 === kicker) this.active2 = null; }
+    if (this.humans[team]) this.claim(kicker, -1);
     if (first) { this.firstKick = team; this.emit({ k: 'kickoffFirst' }); }
   };
 
@@ -196,6 +204,8 @@
     var sdt = dt * this.timeScale;
     this.t += sdt;
     this.phaseT += dt;
+    if (this.cmdQ.length) this.applyCmds();
+    if (this.phase === 'kickoff' || this.phase === 'restart') { if (!this.subChk) { this.subChk = true; this.aiSubs(); } } else this.subChk = false;
     switch (this.phase) {
       case 'kickoff':
         this.animIdle(dt);
@@ -246,11 +256,9 @@
     });
     if (b.noTouchT > 0) { b.noTouchT -= sdt; if (b.noTouchT <= 0) b.noTouch = null; }
 
-    for (var t = 0; t < 2; t++) if (this.humans[t]) this.updateActive(t, sdt);
-    if (this.coop) this.updateActive2();
+    this.updateSeats(sdt);
     this.aiUpdate(sdt);
-    for (t = 0; t < 2; t++) if (this.humans[t]) this.humanControl(t, sdt, dt);
-    if (this.coop) this.humanControl(1, sdt, dt, 0);
+    for (var si = 0; si < this.seats.length; si++) if (this.seats[si] && this.humans[this.seats[si].team]) this.humanControl(si, sdt, dt);
     if (this.phase !== 'play') return; // aksi pemain bisa memicu sinematik
     this.movePlayers(sdt);
     this.updateBall(sdt);
@@ -284,11 +292,16 @@
       }
       p.x += p.vx * dt; p.z += p.vz * dt;
       var sp = Math.sqrt(p.vx * p.vx + p.vz * p.vz);
+      var cap = 40 + 0.6 * p.energy; /* tenaga jangka panjang membatasi stamina sprint */
       if (p.sprint && sp > 3) p.stamina = Math.max(0, p.stamina - stamDrain * dt);
-      else p.stamina = Math.min(100, p.stamina + 7 * dt);
+      else if (p.stamina < cap) p.stamina = Math.min(cap, p.stamina + 7 * (0.5 + 0.005 * p.energy) * dt);
+      else if (p.stamina > cap) p.stamina = Math.max(cap, p.stamina - 5 * dt);
+      this.drainEnergy(p, sp, dt);
+      if (p.faceLock && !this.ball.shot) p.faceLock = 0;
       // arah hadap
       if (p.slideT <= 0 && p.stunT <= 0 && !p.throwIn) {
-        if (sp > 0.6) p.facing = U.angLerp(p.facing, Math.atan2(p.vx, p.vz), Math.min(1, dt * 12));
+        if (p.faceLock) { /* kiper tetap menghadap bola saat menghalau tendangan */ }
+        else if (sp > 0.6) p.facing = U.angLerp(p.facing, Math.atan2(p.vx, p.vz), Math.min(1, dt * 12));
         else if (!p.gkHold && this.ball.owner !== p) {
           var want = Math.atan2(this.ball.x - p.x, this.ball.z - p.z);
           p.facing = U.angLerp(p.facing, want, Math.min(1, dt * 5));
@@ -352,6 +365,7 @@
       this.checkBounds(dt, true);
       return;
     }
+    if (b.shot) { this.stepShot(dt); return; }
     var px = b.x, pz = b.z, py = b.y;
     var bounceK = this.arena.bounce * D.bv(this.ballDef, 'bounce') * D.wv(this.weather, 'bounceMul');
     if (b.y > R + 0.001 || b.vy > 0) b.vy -= 9.8 * dt;
@@ -520,7 +534,7 @@
 
   S.resetBallFree = function () {
     var b = this.ball;
-    b.owner = null; b.pass = null; b.vx = b.vy = b.vz = 0; b.y = R; b.holdT = 0; b.noTouch = null;
+    b.owner = null; b.pass = null; b.vx = b.vy = b.vz = 0; b.y = R; b.holdT = 0; b.noTouch = null; b.shot = null;
     if (this.aim) { this.aim = null; this.tsTarget = 1; }
   };
 
@@ -611,7 +625,7 @@
     var fromMatePass = b.pass && b.pass.from && b.pass.from.team === p.team && b.pass.from !== p;
     if (fromMatePass && b.pass.off && b.pass.to === p && this.phase === 'play') { b.pass = null; this.offsideCall(p); return; }
     var backPass = !!(this.rules.pro && fromMatePass && !b.pass.lob && !b.pass.throwin && b.y < 0.5); /* aturan back-pass: kiper tak boleh menangkap operan kaki rekan */
-    b.owner = p; b.vx = b.vy = b.vz = 0; b.pass = null; b.holdT = 0; b.noTouch = null; b.stuckT = 0;
+    b.owner = p; b.vx = b.vy = b.vz = 0; b.pass = null; b.holdT = 0; b.noTouch = null; b.stuckT = 0; b.shot = null;
     b.last = p;
     if (p.role === 'GK' && this.inOwnBox(p, 0.5) && !backPass) {
       p.gkHold = true; p.gkHoldT = 0; p.anim = 'gkHold'; this.holdBallAt(p);
@@ -619,13 +633,13 @@
     if (fromMatePass) { p.recvAt = this.t; p.fromPass = true; this.addSem(p.team, 2); this.stats[p.team].passes++; }
     else { p.fromPass = false; }
     if (!silent && prev && prev.team !== p.team && p.role !== 'GK') this.emit({ k: 'steal', team: p.team });
-    this.claim(p, 0);
+    this.claim(p, -1);
     if (this.aim && this.aim.p !== p) { this.aim = null; this.tsTarget = 1; }
   };
 
   S.kickFree = function (p, vx, vy, vz, target, anim) {
     var b = this.ball;
-    b.owner = null; b.last = p; b.holdT = 0;
+    b.owner = null; b.last = p; b.holdT = 0; b.shot = null;
     var f = this.faceVec(p);
     if (p.throwIn) { b.x = p.x + f[0] * 0.25; b.z = p.z + f[1] * 0.25; b.y = 2.1; }
     else if (!p.gkHold) { b.x = p.x + f[0] * 0.45; b.z = p.z + f[1] * 0.45; b.y = R + 0.01; }
@@ -717,10 +731,11 @@
     if (card) {
       this.cards.push({ p: this.code(def), card: card, t: this.t });
       this.emit({ k: 'card', p: this.code(def), card: card, team: def.team });
-      if (card === 'merah') { def.hidden = true; def.x = -this.dirOf(def.team) * (F.L / 2 + 6); def.z = F.W / 2 + 5; if (this.active[def.team] === def) this.active[def.team] = this.pl(def.team, 1); if (this.active2 === def) this.active2 = null; }
+      if (card === 'merah') { def.hidden = true; def.x = -this.dirOf(def.team) * (F.L / 2 + 6); def.z = F.W / 2 + 5; this.dropCtl(def); }
     }
     car.stunT = Math.max(car.stunT, 0.4);
     def.stunT = Math.max(def.stunT, 0.5);
+    this.maybeInjure(car, slide ? 0.16 : 0.05);
     this.cancelAim();
     if (inBox) { this.startPenaltyKick(car.team); return; }
     this.restartWith(car.team, U.clamp(car.x, -F.L / 2 + 1, F.L / 2 - 1), U.clamp(car.z, -F.W / 2 + 1, F.W / 2 - 1), 'freekick');
@@ -856,6 +871,7 @@
       }
       this.addSem(def.team, 4);
       this.stats[def.team].tackles++;
+      if (slide) this.maybeInjure(car, 0.05);
       this.emit({ k: 'tackle', ok: 1, p: this.code(def), on: this.code(car) });
     } else {
       if (this.rules.pro && this.phase === 'play' && this.rng() < (slide ? 0.38 : 0.16)) { this.foul(def, car, slide); return; }
@@ -969,7 +985,7 @@
     var att = p.team, aiAtt = !this.humans[att], aiDef = !this.humans[1 - att];
     var dAtt = this.diffOf(att), dDef = this.diffOf(1 - att);
     var sp = p.st.tendang * 3 * c * D.shotMult(shot, zone.id) * U.clamp(1.3 - d / 30, 0.5, 1.05) * (1 - 0.25 * pressure) *
-      D.bv(bd, 'pow') * D.wv(w, 'shot') * (ult ? 1.28 : 1) * (combo ? 1.1 : 1) * p.st.footMul * (this.ball.petirT > 0 ? 1.25 : 1);
+      D.bv(bd, 'pow') * D.wv(w, 'shot') * (ult ? 1.28 : 1) * (combo ? 1.1 : 1) * p.st.footMul * (this.ball.petirT > 0 ? 1.25 : 1) * this.kickFit(p);
     if (aiAtt && this.humans[1 - att]) sp *= [0.9, 1, 1.05][dAtt];
     var skillId = (k && k.style && k.style.map[zone.id]) || '';
     var mult = skillId ? (D.SKILLS[skillId].mult - (shot.pierce || 0)) : 0.95 * D.wv(w, 'keepNormal');
@@ -1083,14 +1099,15 @@
     this.addSem(1 - team, 18);
     this.phase = 'goal'; this.phaseT = 0; this.goalTeam = team;
     this.cancelAim();
-    b.owner = null; b.pass = null; b.inNet = 1;
+    b.owner = null; b.pass = null; b.inNet = 1; b.shot = null;
     var self = this;
     var cel = scorer && scorer.team === team ? scorer : null;
     this.players.forEach(function (p) {
       p.dvx = p.dvz = 0; p.slideT = 0; p.stunT = 0; p.gkHold = false; p.throwIn = false;
       p.celebrate = p.team === team; p.anim = p.team === team ? (p === cel ? 'celebrate' : 'cheer') : 'sad'; p.animT = 0;
     });
-    this.emit({ k: 'goal', team: team, p: this.code(scorer), type: typeId || '', free: free ? 1 : 0, own: own ? 1 : 0, sc: [this.score[0], this.score[1]] });
+    this.emit({ k: 'goal', team: team, p: this.code(scorer), type: typeId || '', free: free ? 1 : 0, own: own ? 1 : 0, sc: [this.score[0], this.score[1]], sk: this.goalSk || '' });
+    this.goalSk = '';
     this.celebrator = scorer && scorer.team === team ? scorer : null;
     if (this.golden) this.endAfterGoal = true;
     void dir; void self;
@@ -1166,7 +1183,7 @@
       var ap = this.aim.p;
       if (b.owner !== ap) this.cancelAim();
       else if (this.aim.t > 2.4) {
-        var inp = this.inputs[ap.team];
+        var inp = this.inputs[this.seatOf(ap)] || blankInput();
         this.doShot(ap, 0.9, inp.zc, inp.zr);
         return;
       }
@@ -1189,7 +1206,7 @@
     this.half = 2; this.swap = !this.swap;
     this.cancelAim();
     var b = this.ball; b.owner = null; b.pass = null;
-    this.players.forEach(function (p) { p.gkHold = false; p.throwIn = false; p.celebrate = false; });
+    this.players.forEach(function (p) { p.gkHold = false; p.throwIn = false; p.celebrate = false; p.energy = Math.min(100, p.energy + 12); });
     this.emit({ k: 'whistle', long: 1 });
     this.emit({ k: 'half', sc: [this.score[0], this.score[1]] });
     this.setupKickoff(1 - this.firstKick, false);
@@ -1257,7 +1274,7 @@
       self.setFacingTo(p, spot.x, spot.z);
     });
     var b = this.ball;
-    b.owner = null; b.pass = null; b.x = spot.x; b.z = spot.z; b.y = R; b.vx = b.vy = b.vz = 0; b.holdT = 0; b.inNet = 0;
+    b.owner = null; b.pass = null; b.x = spot.x; b.z = spot.z; b.y = R; b.vx = b.vy = b.vz = 0; b.holdT = 0; b.inNet = 0; b.shot = null;
   };
 
   S.startPenaltyKick = function (team) {
@@ -1327,7 +1344,7 @@
     var b = this.ball, self = this;
     this.players.forEach(function (p) { p.animT += dt; if (HOLD[p.anim] && p.animT > HOLD[p.anim]) p.anim = p.role === 'GK' ? 'gkReady' : 'idle'; });
     if (pen.state === 'setup') {
-      this.resetInputSeqs(0); this.resetInputSeqs(1);
+      for (var rs = 0; rs < this.seats.length; rs++) this.resetInputSeqs(rs);
       if (pen.t > 1.1) { pen.state = 'aim'; pen.t = 0; this.emit({ k: 'whistle', short: 1 }); }
       return;
     }
@@ -1336,8 +1353,9 @@
       b.owner = sh; // bola menempel untuk logika aksi
       var spot = pen.spot || { x: this.oppGoalX(pen.team) - this.dirOf(pen.team) * F.pen, z: 0 };
       b.x = spot.x; b.z = spot.z; b.y = R;
-      if (this.humans[pen.team]) {
-        var inp = this.inputs[pen.team], hs = this.hs[pen.team];
+      var psi = this.penSeat(pen);
+      if (psi >= 0) {
+        var inp = this.inputs[psi], hs = this.hs[psi];
         if (inp.shootSeq !== hs.shootSeq) {
           hs.shootSeq = inp.shootSeq; hs.shootHeld = inp.shootHeld;
           this.penShoot(sh, inp.charge, inp.zc, inp.zr);
@@ -1452,7 +1470,7 @@
 
   /* ---------------- masukan pemain ---------------- */
   S.setInput = function (team, inp) {
-    if (!inp || team < 0 || team > 1) return;
+    if (!inp || !(team >= 0) || team >= this.inputs.length) return;
     var cur = this.inputs[team];
     var mx = U.clamp(U.num(inp.mx, 0), -1, 1), mz = U.clamp(U.num(inp.mz, 0), -1, 1);
     var l = Math.sqrt(mx * mx + mz * mz); if (l > 1) { mx /= l; mz /= l; }
@@ -1470,168 +1488,31 @@
     cur.passCharge = U.clamp(U.num(inp.passCharge, 0), 0, 1.25);
     cur.lobSeq = U.num(inp.lobSeq, cur.lobSeq) | 0;
     cur.lobCharge = U.clamp(U.num(inp.lobCharge, 0), 0, 1.25);
+    cur.longSeq = U.num(inp.longSeq, cur.longSeq) | 0;
+    cur.longCharge = U.clamp(U.num(inp.longCharge, 0), 0, 1.25);
+    cur.chipSeq = U.num(inp.chipSeq, cur.chipSeq) | 0;
+    cur.chipCharge = U.clamp(U.num(inp.chipCharge, 0), 0, 1.25);
+    cur.easy = !!inp.easy;
+    /* masukan pertama sebuah kursi hanya menyamakan nomor urut tombol: hitungan tombol di perangkat terus bertambah
+       dari laga ke laga, jadi tanpa ini pemain bisa mengoper/menendang sendiri di detik pertama laga berikutnya */
+    if (!this.inPrimed[team]) { this.inPrimed[team] = true; this.resetInputSeqs(team); }
   };
 
   S.resetInputSeqs = function (team) {
     var inp = this.inputs[team], hs = this.hs[team];
+    if (!inp || !hs) return;
     hs.passSeq = inp.passSeq; hs.gocekSeq = inp.gocekSeq; hs.switchSeq = inp.switchSeq; hs.shootSeq = inp.shootSeq; hs.skipSeq = inp.skipSeq; hs.shootHeld = inp.shootHeld; hs.lobSeq = inp.lobSeq;
+    hs.longSeq = inp.longSeq; hs.chipSeq = inp.chipSeq;
   };
 
-  S.updateActive = function (team, dt) {
-    var b = this.ball, cur = this.active[team], co = this.coop && team === 0, a2 = this.active2;
-    if (b.owner && b.owner.team === team && b.owner.role !== 'GK') { if (co) { if (b.owner !== a2) this.claim(b.owner, 0); } else this.active[team] = b.owner; this.swT[team] = 0; return; }
-    if (b.pass && b.pass.to && b.pass.to.team === team && b.pass.to.role !== 'GK') { if (co) { if (b.pass.to !== a2) this.claim(b.pass.to, 0); } else this.active[team] = b.pass.to; return; }
-    var pred = this.predictBall(0.3), best = null, bd = 1e9;
-    this.players.forEach(function (p) {
-      if (p.team !== team || p.role === 'GK' || p.hidden || (co && p === a2)) return;
-      var d = U.dist(p.x, p.z, pred.x, pred.z);
-      if (d < bd) { bd = d; best = p; }
-    });
-    if (!cur || cur.hidden || cur.role === 'GK') { this.active[team] = best; return; }
-    if (best && best !== cur) {
-      var dc = U.dist(cur.x, cur.z, pred.x, pred.z);
-      if (bd + 2.5 < dc) { this.swT[team] += dt; if (this.swT[team] > 0.22) { this.active[team] = best; this.swT[team] = 0; } }
-      else this.swT[team] = 0;
-    }
-  };
-
-  /* pemain yang sedang dikendalikan manusia? */
-  S.isCtl = function (p) {
-    if (!p) return false;
-    if (this.humans[p.team] && this.active[p.team] === p) return true;
-    return this.coop && p.team === 0 && this.active2 === p;
-  };
-  /* beri kendali pemain p ke salah satu pengendali tim 0 (co-op: yang pemainnya lebih dekat) */
-  S.claim = function (p, by) {
-    if (!p || p.role === 'GK' || !this.humans[p.team]) return;
-    if (!this.coop || p.team !== 0) { this.active[p.team] = p; return; }
-    if (p === this.active2 || p === this.active[0]) return;
-    var a1 = this.active[0], a2 = this.active2;
-    var toSecond;
-    if (by === 1) toSecond = false; else if (by === 2) toSecond = true;
-    else if (!a2 || a2.hidden) toSecond = false; else if (!a1 || a1.hidden) toSecond = true;
-    else toSecond = U.dist(a2.x, a2.z, p.x, p.z) < U.dist(a1.x, a1.z, p.x, p.z);
-    if (toSecond) this.active2 = p; else this.active[0] = p;
-  };
-  /* operan dari pemain terkendali: penerima ikut pengendali pengoper */
-  S.claimFor = function (from, r) {
-    if (!r || !this.humans[from.team]) return;
-    if (!this.coop || from.team !== 0) { this.active[from.team] = r; return; }
-    if (r.role === 'GK') return;
-    var byCtl = from === this.active2 ? 2 : (from === this.active[0] ? 1 : 0);
-    if (byCtl === 2 && r !== this.active[0]) this.active2 = r;
-    else if (byCtl === 1 && r !== this.active2) this.active[0] = r;
-    else if (!byCtl) this.claim(r, 0);
-  };
-  S.updateActive2 = function () {
-    if (!this.coop) return;
-    var a1 = this.active[0], a2 = this.active2, b = this.ball;
-    if (a2 && !a2.hidden && a2.role !== 'GK' && a2 !== a1) return;
-    var pred = this.predictBall(0.3), best = null, bd = 1e9;
-    this.players.forEach(function (p) { if (p.team !== 0 || p.role === 'GK' || p.hidden || p === a1) return; var d = U.dist(p.x, p.z, pred.x, pred.z); if (d < bd) { bd = d; best = p; } });
-    this.active2 = best;
-    void b;
-  };
-  S.switchActive2 = function () {
-    var a1 = this.active[0], cur = this.active2, pred = this.predictBall(0.3);
-    var list = this.players.filter(function (p) { return p.team === 0 && p.role !== 'GK' && !p.hidden && p !== cur && p !== a1; });
-    list.sort(function (a, b) { return U.dist(a.x, a.z, pred.x, pred.z) - U.dist(b.x, b.z, pred.x, pred.z); });
-    if (list[0]) { this.active2 = list[0]; this.emit({ k: 'switch', team: 0, ctl: 2 }); }
-  };
-
-  S.switchActive = function (team) {
-    var cur = this.active[team], pred = this.predictBall(0.3), a2 = this.coop && team === 0 ? this.active2 : null;
-    var list = this.players.filter(function (p) { return p.team === team && p.role !== 'GK' && !p.hidden && p !== cur && p !== a2; });
-    list.sort(function (a, b) { return U.dist(a.x, a.z, pred.x, pred.z) - U.dist(b.x, b.z, pred.x, pred.z); });
-    if (list[0]) { this.active[team] = list[0]; this.swT[team] = 0; this.emit({ k: 'switch', team: team }); }
-  };
-
-  S.predictBall = function (t) {
-    var b = this.ball;
-    if (b.owner) return { x: b.x + b.owner.vx * t, z: b.z + b.owner.vz * t };
-    return { x: b.x + b.vx * t * 0.8, z: b.z + b.vz * t * 0.8 };
-  };
-
-  /* ci = indeks pengendali (masukan), team = tim yang dikendalikan (co-op: pengendali 1 → tim 0, pemain kedua) */
-  S.humanControl = function (ci, sdt, dt, teamOv) {
-    var team = teamOv == null ? ci : teamOv, second = ci !== team;
-    var inp = this.inputs[ci], hs = this.hs[ci], b = this.ball;
-    var passE = inp.passSeq !== hs.passSeq, gocekE = inp.gocekSeq !== hs.gocekSeq, swE = inp.switchSeq !== hs.switchSeq, lobE = inp.lobSeq !== hs.lobSeq;
-    var relE = inp.shootSeq !== hs.shootSeq, pressE = inp.shootHeld && !hs.shootHeld;
-    hs.passSeq = inp.passSeq; hs.gocekSeq = inp.gocekSeq; hs.switchSeq = inp.switchSeq; hs.shootSeq = inp.shootSeq; hs.shootHeld = inp.shootHeld; hs.skipSeq = inp.skipSeq; hs.lobSeq = inp.lobSeq;
-    if (lobE && !passE) passE = true, inp._lob = true; else inp._lob = false;
-    var gk = this.pl(team, 0);
-    if (gk.gkHold && b.owner === gk) {
-      if (passE || relE) this.gkDistribute(gk, inp.mx, inp.mz);
-    }
-    var p = second ? this.active2 : this.active[team];
-    if (!p || p.hidden) return;
-    var aiming = this.aim && this.aim.p === p;
-    if (swE && !(b.owner && b.owner.team === team)) { if (second) { this.switchActive2(); p = this.active2; } else { this.switchActive(team); p = this.active[team]; } if (!p) return; aiming = false; }
-    if (p.stunT > 0 || p.slideT > 0) return;
-    // gerak
-    if (aiming) { p.dvx = 0; p.dvz = 0; }
-    else {
-      var spr = inp.sprint && p.stamina > 8;
-      var v = this.maxSpeed(p, spr);
-      p.dvx = inp.mx * v; p.dvz = inp.mz * v; p.sprint = spr && (Math.abs(inp.mx) + Math.abs(inp.mz) > 0.2);
-    }
-    if (b.owner === p && p.throwIn) {
-      p.dvx = 0; p.dvz = 0;
-      if (Math.abs(inp.mx) + Math.abs(inp.mz) > 0.3) p.facing = U.angLerp(p.facing, Math.atan2(inp.mx, inp.mz), 0.15);
-      p.throwT = (p.throwT || 0) + sdt;
-      if (passE || relE || pressE || gocekE || p.throwT > 5) this.doThrowIn(p, inp.mx, inp.mz, inp._lob ? 1 : 0);
-      return;
-    }
-    if (b.owner === p) {
-      if (aiming) {
-        if (relE) { this.doShot(p, inp.charge, inp.zc, inp.zr); return; }
-        if (!inp.shootHeld && this.aim.t > 0.25) { this.doShot(p, inp.charge || 0.5, inp.zc, inp.zr); return; }
-        return;
-      }
-      if (pressE || (relE && !inp.shootHeld)) {
-        if (this.inShotRange(p)) {
-          if (relE && !inp.shootHeld) { this.doShot(p, inp.charge, inp.zc, inp.zr); return; }
-          this.startAim(p); return;
-        }
-        this.doLongKick(p); return;
-      }
-      if (passE) { if (inp._lob) this.doLob(p, inp.mx, inp.mz, inp.lobCharge); else this.doPass(p, inp.mx, inp.mz, inp.passCharge); return; }
-      if (gocekE) {
-        var f = this.faceVec(p);
-        var lat = -f[1] * inp.mx + f[0] * inp.mz;
-        this.doGocek(p, Math.abs(lat) > 0.2 ? lat : 0);
-      }
-      return;
-    }
-    // tanpa bola: ketuk = sliding tackle bila lawan dekat; ditahan lama = mengejar bola otomatis & merebut
-    var car = b.owner;
-    // penerima operan yang stiknya diam: otomatis menjemput bola (seperti rekan NPC), stik digerakkan = kendali penuh pemain
-    if (!car && b.pass && b.pass.to === p && Math.abs(inp.mx) + Math.abs(inp.mz) < 0.2 && !aiming) { this.aiReceive(p, sdt); }
-    if (gocekE) {
-      if (Math.abs(inp.mx) + Math.abs(inp.mz) > 0.2) p.facing = Math.atan2(inp.mx, inp.mz);
-      if (!car || U.dist(p.x, p.z, car.x, car.z) < 4.5) this.doTackle(p, true);
-    }
-    if (inp.chase && !(car && car.team === team) && !aiming) {
-      var lead = car ? 0.25 : 0.45;
-      var tx = b.x + b.vx * lead, tz = b.z + b.vz * lead;
-      if (car) { tx = car.x + car.vx * 0.3; tz = car.z + car.vz * 0.3; }
-      var cdx = tx - p.x, cdz = tz - p.z, cd = Math.sqrt(cdx * cdx + cdz * cdz) || 1;
-      var cspr = p.stamina > 8 && cd > 2.5;
-      var cv = this.maxSpeed(p, cspr);
-      p.dvx = cdx / cd * cv; p.dvz = cdz / cd * cv; p.sprint = cspr;
-      p.chasing = true;
-      if (car && cd < 1.45 && p.tackleCD <= 0) this.doTackle(p, false);
-    } else p.chasing = false;
-    void sdt; void dt;
-  };
+  /* kendali pemain manusia (kursi, pindah pemain, aksi tombol) ada di sim2.js */
 
   /* ---------------- snapshot untuk jaringan ---------------- */
-  S.snapshot = function () {
+  S.snapshot = function (withFit) {
     var b = this.ball, self = this;
     var ps = [];
     this.players.forEach(function (p) {
-      ps.push(Math.round(p.x * 100), Math.round(p.z * 100), Math.round(U.wrap(p.facing) * 100), Math.max(0, ANIMS.indexOf(p.anim)), (p.hidden ? 1 : 0) | (p.gkHold ? 2 : 0) | (p.celebrate ? 4 : 0) | (p.throwIn ? 8 : 0) | (p.sprint ? 16 : 0));
+      ps.push(Math.round(p.x * 100), Math.round(p.z * 100), Math.round(U.wrap(p.facing) * 100), Math.max(0, ANIMS.indexOf(p.anim)), (p.hidden ? 1 : 0) | (p.gkHold ? 2 : 0) | (p.celebrate ? 4 : 0) | (p.throwIn ? 8 : 0) | (p.sprint ? 16 : 0) | (p.diveSide > 0 ? 32 : 0) | (p.diveSide < 0 ? 64 : 0) | (p.injured ? 128 : 0));
     });
     var pen = this.pen, so = this.shootout;
     return {
@@ -1640,10 +1521,11 @@
       ac: [this.active[0] ? this.active[0].idx : -1, this.active[1] ? this.active[1].idx : -1], a2: this.active2 ? this.active2.idx : -1,
       b: [Math.round(b.x * 100), Math.round(b.y * 100), Math.round(b.z * 100), this.code(b.owner), b.petirT > 0 ? 1 : 0, Math.round(b.holdT * 10)],
       p: ps, cn: [this.corners[0], this.corners[1]], gg: this.golden ? 1 : 0, am: this.aim ? this.code(this.aim.p) : -1,
-      pn: pen ? [PEN_STATES.indexOf(pen.state), pen.team, ['single', 'shootout', 'practice'].indexOf(pen.kind), pen.shooter ? pen.shooter.idx : 0] : 0,
+      pn: pen ? [PEN_STATES.indexOf(pen.state), pen.team, ['single', 'shootout', 'practice'].indexOf(pen.kind), pen.shooter ? pen.shooter.idx : 0, this.penSeat(pen)] : 0,
       so: so ? [so.kicks[0].join(''), so.kicks[1].join(''), so.done ? 1 : 0, so.winner] : 0,
       rv: [Object.keys(this.revealed[0]).join(','), Object.keys(this.revealed[1]).join(',')],
-      wn: this.winner, gt: this.goalTeam == null ? -1 : this.goalTeam, hf: this.half, sw: this.swap ? 1 : 0
+      wn: this.winner, gt: this.goalTeam == null ? -1 : this.goalTeam, hf: this.half, sw: this.swap ? 1 : 0,
+      cp: this.seats.map(function (st) { return st && st.p ? self.code(st.p) : -1; }), fit: withFit ? this.fitSnap() : 0
     };
   };
 })(typeof window !== 'undefined' ? window : globalThis);

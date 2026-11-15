@@ -230,7 +230,9 @@
   };
   var SHOT_EN = { naga: 'Fire Dragon', macan: 'Black Panther', garuda: 'Garuda Wings', banteng: 'Raging Bull', keris: 'Star Keris', meteor: 'Village Meteor', beliung: 'Fire Twister', tinju: 'Fire Fist' };
   var SKILL_EN = { tapak: 'the Iron Palm', cakar: 'the Eagle Claw', tameng: 'the Mystic Shield', karang: 'the Coral Fortress', banyu: 'the Water Curtain', selendang: 'the Magic Shawl', bayu: 'the Wind Vortex', seribu: 'the Thousand Hands', rajawali: 'the Hawk Wings', bumi: 'the Earth Stance' };
-  var ARENA_EN = { kampung: 'the village pitch', sawah: 'the rice field', pantai: 'Sunset Beach', alun: 'the town square', tol: 'under the toll road', bukit: 'Red Clay Hill', sekolah: 'the school yard', rel: 'the railway pitch' };
+  var ARENA_EN = { kampung: 'the village pitch', sawah: 'the rice field', pantai: 'Sunset Beach', alun: 'the town square', tol: 'under the toll road', bukit: 'Red Clay Hill', sekolah: 'the school yard', rel: 'the railway pitch', stadion: 'the Regency Stadium',
+    pasarmalam: 'the night market', candi: 'the temple courtyard', kebunteh: 'the tea plantation', dermaga: "the fishermen's pier", kawah: 'the fire crater', atap: 'the city rooftop',
+    bambu: 'the bamboo forest', gor: 'the futsal hall', anjungan: 'the offshore platform', gbk: 'the Grand Stadium' };
   N.LINES = L;
 
   /* ======================================================================
@@ -256,6 +258,13 @@
       cardRed: ['KARTU MERAH! {p} diusir keluar lapangan! Timnya main dengan sepuluh orang!', 'Merah! {p} harus keluar. Silakan ke warung, Pak, pertandingan lanjut tanpa Anda.', '{p} dikeluarkan wasit! Penonton bersorak, sebagian menyoraki.'],
       freekick: ['Tendangan bebas untuk {t}. Pagar betis sudah disusun.', 'Tendangan bebas! Posisi bagus untuk mengarah ke gawang.', 'Bola mati untuk {t}. Semua menunggu, siapa yang akan mengambil?'],
       halfTime: ['Turun minum! Skor sementara {a} {sa} - {sb} {b}. Kedua tim bertukar sisi lapangan.', 'Peluit babak pertama! {a} {sa}, {b} {sb}. Waktunya es teh dan evaluasi pelatih.', 'Babak pertama usai, {sa}-{sb}. Babak kedua, tim bertukar gawang. Jangan salah arah, ya!'],
+      strikeLong: ['{p} melepas tendangan keras dari jauh!', 'Dari jarak {d} meter, {p} mencoba peruntungan!', '{p} menembak dari luar kotak!', 'Tendangan geledek {p}!', '{p} tidak mau menunggu, langsung tembak dari jauh!'],
+      strikeChip: ['{p} mencungkil bola melewati kiper!', 'Cungkilan cantik dari {p}!', '{p} mengangkat bola pelan-pelan ke arah gawang!', 'Bola dicungkil {p}, kiper sudah telanjur maju!'],
+      goalLong: ['GOOOL! Tendangan jarak jauh {p} bersarang di gawang!', 'MASUK! {p} menembak dari jauh dan kiper tak berkutik!', 'Gol roket dari {p}! Jala gawang hampir jebol!', 'GOL! Dari jauh, keras, dan tepat. {p} luar biasa!'],
+      goalChip: ['GOOOL! Cungkilan {p} melewati kepala kiper!', 'Cantik sekali! {p} mencungkil bola masuk gawang!', 'GOL! Kiper cuma bisa menengok ke atas, bola {p} sudah masuk.', 'Gol kelas dunia dari kampung! Cungkilan {p} sempurna!'],
+      block: ['Diblok! {p} menghadang tendangan dengan badannya!', '{p} pasang badan, tendangan mental!', 'Tembok hidup bernama {p}! Tendangan terhalang.', 'Kena {p}! Bola tidak sampai ke gawang.'],
+      injury: ['Aduh, {p} tergeletak kesakitan! Sepertinya cedera.', '{p} terpincang-pincang. {t} harus memikirkan pergantian.', 'Cedera untuk {p}! Tukang urut kampung siap-siap.', '{p} memegangi kakinya. Semoga cuma keseleo.'],
+      sub: ['Pergantian pemain {t}: {on} masuk menggantikan {off}.', '{off} ditarik keluar, {on} masuk dengan tenaga segar.', '{t} mengganti pemain: {on} masuk, {off} istirahat.', 'Tenaga baru untuk {t}! {on} masuk lapangan.'],
       backpass: ['Operan ke kiper! {p} tidak boleh menangkap dengan tangan, main pakai kaki dulu.', 'Back-pass! Kiper {t} harus memainkan bola dengan kaki. Jangan sampai salah umpan!'],
       powerPass: ['Operan terukur dari {p}! Bola meluncur kencang menyusur tanah.', '{p} melepas operan keras! Penerimanya harus siap kaki.'],
       lobPass: ['Umpan lambung {p}! Bola terbang melewati kepala bek.', 'Lob cantik dari {p}, bola turun di depan rekannya.', '{p} mencungkil bola, melayang jauh ke depan!']
@@ -279,6 +288,13 @@
       cardRed: ['RED CARD! {p} is sent off! Down to ten men!', 'Red! {p} has to go. Off to the snack stall, sir, the match goes on without you.', '{p} is dismissed! The crowd cheers, some of them boo.'],
       freekick: ['Free kick to {t}. The wall is being set.', 'Free kick! A good position to aim at goal.', 'Dead ball for {t}. Everyone waits, who will take it?'],
       halfTime: ['Half time! {a} {sa} - {sb} {b}. The teams change ends.', 'The first-half whistle! {a} {sa}, {b} {sb}. Time for iced tea and a team talk.', 'First half over at {sa}-{sb}. Second half, they swap goals. Do not run the wrong way!'],
+      strikeLong: ['{p} lets fly from distance!', 'From {d} metres out, {p} tries his luck!', '{p} shoots from outside the box!', 'A thunderbolt from {p}!', '{p} is not waiting around, straight in with a long shot!'],
+      strikeChip: ['{p} chips it over the keeper!', 'A lovely chip from {p}!', '{p} lifts the ball gently towards goal!', 'Chipped by {p}, and the keeper is already off the line!'],
+      goalLong: ['GOOOAL! The long-range shot from {p} is in the net!', 'IT IS IN! {p} shoots from distance and the keeper cannot move!', 'A rocket from {p}! The net nearly bursts!', 'GOAL! Far, hard and accurate. {p} is brilliant!'],
+      goalChip: ['GOOOAL! The chip from {p} sails over the keeper!', 'Beautiful! {p} chips it into the goal!', 'GOAL! The keeper can only look up, the ball from {p} is already in.', 'A world-class goal from the village! A perfect chip by {p}!'],
+      block: ['Blocked! {p} gets his body in the way!', '{p} throws himself at it, the shot bounces away!', 'A living wall called {p}! The shot is stopped.', 'It hits {p}! The ball never reaches the goal.'],
+      injury: ['Ouch, {p} is down in pain! That looks like an injury.', '{p} is limping. {t} need to think about a substitution.', 'An injury for {p}! Call the village masseur.', '{p} is holding his leg. Let us hope it is only a sprain.'],
+      sub: ['Substitution for {t}: {on} comes on for {off}.', '{off} is taken off, {on} comes on with fresh legs.', '{t} make a change: {on} on, {off} takes a rest.', 'Fresh energy for {t}! {on} enters the pitch.'],
       backpass: ['Back-pass! {p} cannot pick that up, it has to be played with the feet.', 'A pass back to the keeper! The {t} keeper must use his feet. Careful now!'],
       powerPass: ['A driven pass from {p}! The ball zips along the ground.', '{p} fires a hard pass! The receiver had better be ready.'],
       lobPass: ['A lofted pass from {p}! Over the defender\'s head.', 'Lovely chip from {p}, dropping in front of a teammate.', '{p} scoops it up, sailing far forward!']
@@ -333,13 +349,18 @@
     jakarta: { words: [[/\bsekali\b/gi, 'banget'], [/\bsangat\b/gi, 'banget'], [/\btidak\b/gi, 'nggak'], [/\bsudah\b/gi, 'udah']],
       open: ['Gaes, ', 'Wih, ', 'Eh, '], close: [' gaes!', ' sih!', '', ''], pOpen: 0.35, pClose: 0.45 }
   };
-  N.accentize = function (text, pe) {
+  N.accentize = function (text, pe, vals) {
     pe = pe || N.persona; var ac = pe && ACCENT[pe.accent];
     if (!ac || N.lang === 'en') return text;
     var t = String(text);
     ac.words.forEach(function (w) { t = t.replace(w[0], function (m) { return m[0] === m[0].toUpperCase() && m[0] !== m[0].toLowerCase() ? w[1].charAt(0).toUpperCase() + w[1].slice(1) : w[1]; }); });
     var r = Math.random();
-    if (r < ac.pOpen && !/^(GO|MASU|PENALTI|OFFSIDE|KARTU|TIANG)/i.test(t)) { var o = ac.open[Math.floor(Math.random() * ac.open.length)]; t = o + t.charAt(0).toLowerCase() + t.slice(1); }
+    if (r < ac.pOpen && !/^(GO|MASU|PENALTI|OFFSIDE|KARTU|TIANG)/i.test(t)) { var o = ac.open[Math.floor(Math.random() * ac.open.length)];
+      /* kalimat yang diawali nama orang/tim tetap berhuruf besar setelah kata pembuka */
+      var keepCap = false;
+      if (vals) Object.keys(vals).forEach(function (k) { var x = vals[k]; if (typeof x === 'string' && x && t.indexOf(x) === 0) keepCap = true; });
+      t = o + (keepCap ? t : t.charAt(0).toLowerCase() + t.slice(1));
+    }
     else if (r < ac.pOpen + ac.pClose) { var c = ac.close[Math.floor(Math.random() * ac.close.length)]; if (c) t = t.replace(/[.!?]+$/, '') + c; }
     return t.charAt(0).toUpperCase() + t.slice(1);
   };
@@ -644,7 +665,7 @@
     if (N.lang === 'off') return false;
     var line = pick(key);
     if (!line) return false;
-    var it = { text: N.accentize(fill(line, v), N.persona), prio: prio || 0, at: now(), key: key };
+    var it = { text: N.accentize(fill(line, v), N.persona, v), prio: prio || 0, at: now(), key: key };
     if (!it.text) return false;
     opts = opts || {};
     if (cur) {
@@ -774,6 +795,10 @@
         break;
       }
       case 'miss': p = plr(st, e.p); N.say(Math.random() < 0.45 ? 'missSarc' : 'miss', { p: p ? p.name : '' }, 2); break;
+      case 'strike': p = plr(st, e.p); if (p && Math.random() < 0.65) N.say(e.kind === 'cungkil' ? 'strikeChip' : 'strikeLong', { p: p.name, d: Math.max(8, e.d | 0) }, 1); break;
+      case 'block': p = plr(st, e.p); if (p) N.say('block', { p: p.name }, 2); break;
+      case 'injury': p = plr(st, e.p); if (p) N.say('injury', { p: p.name, t: teamName(st, e.team) }, 2, { queue: true }); break;
+      case 'sub': N.say('sub', { on: String(e.on || ''), off: String(e.off || ''), t: teamName(st, e.team) }, 2, { queue: true }); break;
       case 'save': {
         var kp = st.pl ? st.pl(e.team === 1 ? 1 : 0, 0) : null, kn = kp ? kp.name : '';
         if (e.small || fromCine('save')) break;
@@ -798,6 +823,7 @@
     if (e.pen && st.shootout) { if (!said) N.say('penGoal', { p: nm }, 3); return; }
     if (said) { /* sudah diumumkan saat adegan */ }
     else if (e.own) N.say('ownGoal', { p: nm }, 3);
+    else if (e.sk === 'jauh' || e.sk === 'cungkil') N.say(e.sk === 'cungkil' ? 'goalChip' : 'goalLong', { p: nm }, 3);
     else if (e.free) N.say('goalFree', { p: nm }, 3);
     else N.say('goal', { p: nm, s: shotName(e.type) }, 3);
     if (!sc || st.mode !== 'match') return;

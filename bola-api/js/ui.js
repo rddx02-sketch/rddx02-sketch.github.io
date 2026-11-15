@@ -7,8 +7,11 @@
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   function clear(n) { while (n && n.firstChild) n.removeChild(n.firstChild); }
   function click() { if (BA.Audio) { BA.Audio.init(); BA.Audio.click(); } }
+  function T(s) { return BA.t ? BA.t.apply(null, arguments) : s; }
+  /* terjemahkan teks gabungan (mis. ringkasan aturan) di mode Inggris */
+  UI.tr = function (s) { return BA.I18n ? BA.I18n.tr(s) : s; };
 
-  var SCREENS = ['scrMenu', 'scrTeam', 'scrSetup', 'scrOnline', 'scrGuide', 'scrSettings', 'scrResult', 'scrBracket', 'scrPause'];
+  var SCREENS = ['scrMenu', 'scrTeam', 'scrSetup', 'scrOnline', 'scrGuide', 'scrSettings', 'scrResult', 'scrBracket', 'scrPause', 'scrStrategy'];
 
   UI.show = function (name, push) {
     SCREENS.forEach(function (s) { var n = $(s); if (n) n.hidden = s !== name; });
@@ -126,12 +129,12 @@
     var selfUrl = (function () { try { return String(location.href); } catch (e) { return ''; } })();
     if (u.ios || u.ipad) {
       var iosV = (function () { var m = (navigator.userAgent || '').match(/OS (\d+)[._](\d+)/); return m ? parseFloat(m[1] + '.' + m[2]) : 0; })();
-      if (iosV && iosV < 16.4) lines.push('iPhone dengan iOS ' + iosV + ' belum mendukung layar penuh untuk halaman web (butuh iOS 16.4 ke atas).');
+      if (iosV && iosV < 16.4) lines.push(T('iPhone dengan iOS {0} belum mendukung layar penuh untuk halaman web (butuh iOS 16.4 ke atas).', iosV));
       else lines.push(failed ? 'Safari menolak permintaan layar penuh di jendela ini.' : 'Safari di iPhone hanya mengizinkan layar penuh bila halaman dibuka langsung, bukan di dalam jendela lain.');
       lines.push('Cara paling pasti: ketuk "Buka di tab sendiri", lalu di Safari tekan tombol ⛶ lagi. Atau tekan Bagikan (kotak dengan panah) → "Tambah ke Layar Utama", lalu buka game dari ikon itu: tampil penuh tanpa bilah alamat. Putar HP ke posisi lanskap agar bilah Safari ikut menyusut.');
     } else if (u.framed) {
       lines.push(failed ? 'Layar penuh ditolak di jendela ini.' : 'Layar penuh tidak diizinkan di dalam jendela ini.');
-      lines.push('Buka game di tab sendiri, lalu tekan tombol layar penuh lagi' + (u.android ? '. Di Android, menu browser → "Tambahkan ke layar utama" juga membuat game tampil penuh.' : ' (atau F11 di PC).'));
+      lines.push(u.android ? 'Buka game di tab sendiri, lalu tekan tombol layar penuh lagi. Di Android, menu browser → "Tambahkan ke layar utama" juga membuat game tampil penuh.' : 'Buka game di tab sendiri, lalu tekan tombol layar penuh lagi (atau F11 di PC).');
     } else {
       lines.push(failed ? 'Browser menolak permintaan layar penuh. Coba lagi lewat tombol, atau tekan F11 di PC.' : 'Browser ini tidak mendukung layar penuh dari halaman web. Tekan F11 di PC, atau pakai menu browser "Tambahkan ke layar utama" di HP.');
     }
@@ -141,7 +144,7 @@
       } });
     }
     btns.push({ label: 'Tutup' });
-    UI.confirm('Layar penuh', lines.join(' '), btns);
+    UI.confirm('Layar penuh', lines.map(function (l) { return T(l); }).join(' '), btns);
   };
   UI.syncFullscreen = function () {
     var b = $('btnFs'); if (!b) return;
@@ -202,7 +205,7 @@
     clear(box);
     colors.forEach(function (c) {
       var b = el('button', 'sw' + (c === cur ? ' on' : ''));
-      b.type = 'button'; b.style.background = c; b.setAttribute('aria-label', 'Warna ' + c);
+      b.type = 'button'; b.style.background = c; b.setAttribute('aria-label', T('Warna {0}', c));
       b.addEventListener('click', function () { click(); pick(c); });
       box.appendChild(b);
     });
@@ -271,9 +274,9 @@
     swatches($('swC1'), D.TEAM_COLORS, T.c1, function (c) { T.c1 = c; save(); });
     swatches($('swC2'), D.TEAM_COLORS, T.c2, function (c) { T.c2 = c; save(); });
     swatches($('swGK'), D.TEAM_COLORS, T.gk, function (c) { T.gk = c; save(); });
-    chips($('chKind'), D.KINDS.map(function (k) { return { id: k.id, n: k.n }; }), T.kind || 'manusia', function (v) { T.kind = v; save(); UI.toast('Tim jadi ' + (D.kindById[v] || D.KINDS[0]).n); });
+    chips($('chKind'), D.KINDS.map(function (k) { return { id: k.id, n: k.n }; }), T.kind || 'manusia', function (v) { T.kind = v; save(); UI.toast(BA.t('Tim jadi {0}', (D.kindById[v] || D.KINDS[0]).n)); });
     var kd = D.kindById[T.kind || 'manusia'] || D.KINDS[0];
-    $('kindHint').textContent = kd.desc + (kd.variants.length ? ' Wujud tiap pemain dipilih di tab Pemain.' : '');
+    $('kindHint').textContent = BA.t(kd.desc) + (kd.variants.length ? ' ' + BA.t('Wujud tiap pemain dipilih di tab Pemain.') : '');
     $('sectPpe').hidden = kd.id !== 'migas';
     if (kd.id === 'migas') chips($('chPpe'), D.PPE.map(function (q) { return { id: q.id, n: q.n }; }), T.ppe || 'helm', function (v) { T.ppe = v; save(); });
     var plainOutfit = kd.id === 'manusia' || kd.id === 'siluman' || kd.id === 'mamalia';
@@ -334,7 +337,7 @@
     }
     var kdef = D.kindById[T.kind || 'manusia'] || D.KINDS[0];
     if (kdef.variants.length) {
-      var sv = sect(box, 'Wujud ' + kdef.n.toLowerCase()); var cv = el('div', 'chips'); sv.appendChild(cv);
+      var sv = sect(box, BA.t('Wujud {0}', BA.t(kdef.n).toLowerCase())); var cv = el('div', 'chips'); sv.appendChild(cv);
       chips(cv, kdef.variants.map(function (v) { return { id: v.id, n: v.n }; }), D.variantOf(T, p, i), function (v) { p.variant = v; save(); });
     }
     var s5 = sect(box, 'Alas kaki'); var c5 = el('div', 'chips'); s5.appendChild(c5);
@@ -372,6 +375,7 @@
     UI.setupMode = mode; UI.setupCfg = cfg;
     $('setupTitle').textContent = MODE_TITLE[mode] || 'Atur Pertandingan';
     $('btnStart').textContent = mode === 'host' ? 'Simpan aturan' : (mode === 'tour' ? 'Mulai Turnamen' : (mode === 'practice' ? 'Mulai Latihan' : 'Mulai Tanding'));
+    var bss = $('btnSetupStrategy'); if (bss) bss.hidden = !(mode === 'quick' || mode === 'tour');
     UI.renderSetup();
     UI.show('scrSetup');
   };
@@ -388,13 +392,13 @@
       re();
     });
     if (mode === 'host') {
-      var sm = sect(box, 'Cara main berdua'); var cm = el('div', 'chips'); sm.appendChild(cm);
-      chips(cm, [{ id: 0, n: '1 lawan 1' }, { id: 1, n: 'Bersama lawan NPC (co-op)' }], cfg.coop ? 1 : 0, function (v) { cfg.coop = v === 1; re(); });
-      sm.appendChild(el('p', 'hint', cfg.coop ? 'Kalian berdua satu tim (tim tuan rumah) melawan tim komputer. Masing-masing mengendalikan satu pemain; tombol GANTI memilih pemain lain yang belum dipegang temanmu.' : 'Tim tuan rumah melawan tim tamu, masing-masing mengendalikan timnya sendiri.'));
+      var sm = sect(box, 'Tamu baru masuk ke'); var cm = el('div', 'chips'); sm.appendChild(cm);
+      chips(cm, [{ id: 0, n: 'Tim B (lawan tuan rumah)' }, { id: 1, n: 'Tim A (setim, lawan NPC)' }], cfg.coop ? 1 : 0, function (v) { cfg.coop = v === 1; re(); });
+      sm.appendChild(el('p', 'hint', 'Sampai 8 pemain bisa bergabung. Ini hanya penempatan awal: di room, tuan rumah bebas memindahkan tiap pemain ke Tim A atau Tim B (semua satu tim, 2 lawan 2, 3 lawan 5, dan seterusnya). Tiap orang memegang satu pemain; tombol GANTI memilih pemain lain yang belum dipegang teman. Posisi kosong diisi NPC.'));
     }
-    if (mode === 'quick' || mode === 'pen' || (mode === 'host' && cfg.coop)) {
-      var s0 = sect(box, mode === 'host' ? 'Lawan NPC' : 'Lawan'); var c0 = el('div', 'chips'); s0.appendChild(c0);
-      var opts = D.TEAMS.map(function (t, i) { var kn = t.kind && t.kind !== 'manusia' ? ' · ' + (D.kindById[t.kind] || {}).n : ''; return { id: i, n: t.name + kn + ' ' + '★'.repeat(t.level + 1), dot: t.c1 }; });
+    if (mode === 'quick' || mode === 'pen' || mode === 'host') {
+      var s0 = sect(box, mode === 'host' ? 'Tim NPC (dipakai bila Tim B tanpa pemain manusia)' : 'Lawan'); var c0 = el('div', 'chips'); s0.appendChild(c0);
+      var opts = D.TEAMS.map(function (t, i) { var kn = t.kind && t.kind !== 'manusia' ? ' · ' + BA.t((D.kindById[t.kind] || {}).n || '') : ''; return { id: i, n: t.name + kn + ' ' + '★'.repeat(t.level + 1), dot: t.c1 }; });
       opts.push({ id: -1, n: 'Acak' });
       chips(c0, opts, cfg.opp, function (v) { cfg.opp = v; re(); });
     }
@@ -410,7 +414,7 @@
     var wl = D.WEATHERS.map(function (w) { return { id: w.id, n: w.name }; }); wl.push({ id: 'acak', n: 'Acak' });
     chips(c2, wl, cfg.weather, function (v) { cfg.weather = v; re(); });
     var wd = D.weatherById[cfg.weather];
-    s2.appendChild(el('p', 'hint', wd ? wd.desc : 'Cuaca dipilih acak saat pertandingan dimulai.'));
+    s2.appendChild(el('p', 'hint', (D.arenaById[cfg.arena] && D.arenaById[cfg.arena].indoor) ? 'Arena dalam ruangan: cuaca dan angin tidak berpengaruh.' : (wd ? wd.desc : 'Cuaca dipilih acak saat pertandingan dimulai.')));
     var s3 = sect(box, 'Jenis bola'); var c3 = el('div', 'chips'); s3.appendChild(c3);
     chips(c3, D.BALLS.map(function (b) { return { id: b.id, n: b.name, dot: b.fire[0] }; }), cfg.ball, function (v) { cfg.ball = v; re(); });
     var bd = D.ballById[cfg.ball];
@@ -448,7 +452,7 @@
     document.querySelectorAll('[data-onl]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-onl') === (lan ? 'lan' : m)); });
     $('onHost').classList.toggle('hidden', m !== 'host');
     $('onGuest').classList.toggle('hidden', m !== 'guest');
-    var ol = $('onLan'); if (ol) ol.hidden = m !== 'lan';
+    var ol = $('onLan'); if (ol) ol.hidden = !(m === 'lan' || (lan && m === 'host')); /* tuan rumah WiFi lokal: bagian undangan tetap terbuka untuk tamu berikutnya */
     var hq = $('hostQrSect'), gs = $('guestScanSect');
     if (hq) hq.classList.toggle('hidden', !!lan); if (gs) gs.classList.toggle('hidden', !!lan);
   };
@@ -463,7 +467,7 @@
   };
   UI.vsBox = function (id, a, b, coop) {
     var box = $(id); clear(box); box.classList.remove('hidden');
-    if (coop) box.appendChild(el('p', 'hint', 'Co-op: kalian berdua di tim ' + a.name + ' melawan NPC'));
+    if (coop) box.appendChild(el('p', 'hint', T('Co-op: kalian berdua di tim {0} melawan NPC', a.name)));
     var vs = el('div', 'vs');
     [a, null, b].forEach(function (t) {
       if (!t) { vs.appendChild(el('div', 'x', 'VS')); return; }
@@ -476,7 +480,6 @@
     var a = D.arenaById[cfg.arena], w = D.weatherById[cfg.weather], b = D.ballById[cfg.ball], R = cfg.rules, fd = D.fieldById[cfg.field] || D.FIELDS[0];
     var parts = [fd.name + ' ' + fd.short, (a ? a.name : '-'), (w ? w.name : 'Cuaca acak'), (b ? b.name : '-'), D.DURATIONS.filter(function (d) { return d.v === R.dur; }).map(function (d) { return d.n; })[0] || '',
       (D.TIES.filter(function (t) { return t.id === R.tie; })[0] || {}).n || '', (D.BOUNDS.filter(function (t) { return t.id === R.bound; })[0] || {}).n || ''];
-    if (cfg.coop) parts.unshift('Co-op: berdua lawan ' + (cfg.opp >= 0 && D.TEAMS[cfg.opp] ? D.TEAMS[cfg.opp].name : 'tim acak'));
     if (R.pro) parts.push('Liga Pro (2 babak, offside, tendangan bebas, kartu)');
     if (R.tigaPojok && R.bound === 'keluar' && !R.pro) parts.push('3 pojok = penalti');
     if (R.bolaPanas && !R.pro) parts.push('Bola panas');
@@ -484,58 +487,47 @@
   };
 
   /* ---------- panduan ---------- */
+  /* Panduan: isi dua bahasa di js/guide.js; tabel tombol dan daftar cuaca/bola dibuat dari data */
   UI.buildGuide = function () {
     var box = $('guideBody'); clear(box);
-    function para(s, html) { var p = el('p'); html.forEach(function (h) { if (typeof h === 'string') p.appendChild(document.createTextNode(h)); else p.appendChild(el('b', null, h.b)); }); s.appendChild(p); }
-    var In = BA.Input;
-    var s1 = sect(box, 'Kontrol layar sentuh');
-    var k = el('div', 'keys');
-    [['Joystick kiri', 'Lari. Dorong penuh untuk sprint otomatis.'], ['SPRINT', 'Tahan untuk lari kencang (stamina berkurang).'], ['TENDANG', 'Tahan untuk mengisi tenaga, lepas untuk menendang. Saat membidik, joystick memilih arah gawang.'], ['OPER', 'Ketuk = umpan datar otomatis ke kawan di arah joystick. TAHAN = cincin tenaga terisi; makin lama ditahan makin kencang operannya, arahnya mengikuti hadap badan pemain (kawan sejauh apa pun di depanmu bisa jadi sasaran). Saat kiper memegang bola: lempar.'], ['LAMBUNG', 'Umpan melambung lewat atas lawan ke arah hadap badan. Tahan lebih lama = terbang lebih jauh. Kawan yang dituju otomatis berlari menjemput bola.'], ['GOCEK / REBUT', 'Saat pegang bola: gocek mengecoh lawan. Tanpa bola: ketuk = tekel sapuan; TAHAN LAMA = pemain aktif otomatis mengejar bola sambil sprint dan merebut saat dekat.'], ['GANTI', 'Pindah ke pemain terdekat dengan bola.']].forEach(function (r) {
-      k.appendChild(el('kbd', null, r[0])); k.appendChild(el('span', null, r[1]));
-    });
-    s1.appendChild(k);
-    var kn = function (a) { return In.keys[a].filter(Boolean).map(In.keyName).join(' / ') || '—'; };
+    var lang = BA.I18n && BA.I18n.lang === 'en' ? 'en' : 'id';
+    var blocks = (BA.GUIDE && (BA.GUIDE[lang] || BA.GUIDE.id)) || [];
+    box.setAttribute('data-noi18n', ''); /* isi sudah sesuai bahasa: jangan diterjemahkan ulang */
+    function rich(node, text) {
+      String(text).split('**').forEach(function (part, i) { if (!part) return; if (i % 2) node.appendChild(el('b', null, part)); else node.appendChild(document.createTextNode(part)); });
+      return node;
+    }
+    var In = BA.Input, cur = box;
+    var kn = function (a) { return In.keys[a].filter(Boolean).map(function (c) { return T(In.keyName(c)); }).join(' / ') || '—'; };
     var pn = function (a) { return In.pad[a].filter(function (b) { return b >= 0; }).map(function (b) { return In.padName(b); }).join(' / ') || '—'; };
-    var sK = sect(box, 'Keyboard & stik PS');
-    var tbl = el('div', 'keys keys3');
-    tbl.appendChild(el('b', null, 'Aksi')); tbl.appendChild(el('b', null, 'Keyboard')); tbl.appendChild(el('b', null, 'Stik PS'));
-    [['Gerak', kn('up') + ' ' + kn('left') + ' ' + kn('down') + ' ' + kn('right'), 'Analog kiri / D-pad']].concat(In.ACTIONS.filter(function (a) { return ['up', 'down', 'left', 'right'].indexOf(a.id) < 0; }).map(function (a) { return [a.n, kn(a.id), pn(a.id)]; })).forEach(function (r) {
-      tbl.appendChild(el('span', null, r[0])); tbl.appendChild(el('kbd', null, r[1])); tbl.appendChild(el('kbd', null, r[2]));
+    blocks.forEach(function (bl) {
+      if (bl.h) { cur = sect(box, bl.h); return; }
+      if (bl.keys) {
+        var k = el('div', 'keys');
+        bl.keys.forEach(function (r) { k.appendChild(el('kbd', null, r[0])); k.appendChild(el('span', null, r[1])); });
+        cur.appendChild(k); return;
+      }
+      if (bl.p) { cur.appendChild(rich(el('p'), bl.p)); return; }
+      if (bl.hint) { cur.appendChild(rich(el('p', 'hint'), bl.hint)); return; }
+      if (bl.ul || bl.ol) {
+        var list = el(bl.ul ? 'ul' : 'ol', bl.ol ? 'steps' : null);
+        (bl.ul || bl.ol).forEach(function (t) { list.appendChild(rich(el('li'), t)); });
+        cur.appendChild(list); return;
+      }
+      if (bl.dyn === 'binds') {
+        var tbl = el('div', 'keys keys3');
+        tbl.appendChild(el('b', null, T('Aksi'))); tbl.appendChild(el('b', null, 'Keyboard')); tbl.appendChild(el('b', null, T('Stik PS')));
+        [[T('Gerak'), kn('up') + ' ' + kn('left') + ' ' + kn('down') + ' ' + kn('right'), T('Analog kiri / D-pad')]].concat(In.ACTIONS.filter(function (a) { return ['up', 'down', 'left', 'right'].indexOf(a.id) < 0; }).map(function (a) { return [T(a.n), kn(a.id), pn(a.id)]; })).forEach(function (r) {
+          tbl.appendChild(el('span', null, r[0])); tbl.appendChild(el('kbd', null, r[1])); tbl.appendChild(el('kbd', null, r[2]));
+        });
+        cur.appendChild(tbl); return;
+      }
+      if (bl.dyn === 'weather') {
+        var ul2 = el('ul');
+        D.WEATHERS.concat(D.BALLS).forEach(function (w) { var li = el('li'); li.appendChild(el('b', null, T(w.name) + ': ')); li.appendChild(document.createTextNode(T(w.desc))); ul2.appendChild(li); });
+        cur.appendChild(ul2);
+      }
     });
-    sK.appendChild(tbl);
-    sK.appendChild(el('p', 'hint', 'Semua tombol bisa diubah di Pengaturan. Stik Xbox juga bisa: ✕=A, ○=B, □=X, △=Y, L1/R1=LB/RB.'));
-    var sN = sect(box, 'Narator & lapangan');
-    para(sN, ['Komentator pertandingan bisa berbahasa ', { b: 'Indonesia' }, ' atau ', { b: 'English' }, ', lengkap dengan suara dan teks. Ada enam narator berlogat: ', { b: 'Koh Ahong' }, ' (Cina), ', { b: 'Mas Bejo' }, ' (Jawa), ', { b: 'Bang Togar' }, ' (Batak), ', { b: 'Kang Asep' }, ' (Sunda), ', { b: 'Encik Zul' }, ' (Melayu), dan ', { b: 'Mbak Rere' }, ' (wanita, Jakarta). Logat mengubah kata & sisipan khas di komentar dan suara. Atur di Pengaturan → Narator.']);
-    var sW = sect(box, 'WiFi lokal / hotspot tanpa internet');
-    para(sW, ['Di ', { b: 'Main Online → 📶 WiFi lokal' }, ': kedua HP di WiFi yang sama (atau satu HP menyalakan hotspot). Tuan rumah menekan ', { b: 'Buat kode undangan' }, ' lalu mengirim kodenya (QR, Bagikan ke WhatsApp/Bluetooth, atau salin). Tamu menempel/memindai kode itu, menekan ', { b: 'Buat kode balasan' }, ', dan mengirim balik. Tuan rumah menempel balasan → ', { b: 'Sambungkan' }, '. Setelah itu lobi, Saya siap, dan pertandingan berjalan langsung antar HP tanpa server. Mode ini juga bekerja di file game mandiri (HTML) di luar claude.ai. Bluetooth sendiri tidak bisa dipakai browser untuk bermain, hanya untuk mengirim kodenya.']);
-    var sC = sect(box, 'Main berdua: 1 lawan 1 atau co-op lawan NPC');
-    para(sC, ['Dua HP beda merek (Android, iPhone, tablet, PC) bisa main bersama lewat ', { b: 'Main Online' }, ' (internet, termasuk saat keduanya memakai hotspot yang sama) atau ', { b: 'WiFi lokal' }, ' (tanpa internet). Di lobi, tuan rumah membuka ', { b: 'Ubah aturan → Cara main berdua' }, ': ', { b: '1 lawan 1' }, ' (tim lawan tim) atau ', { b: 'Bersama lawan NPC' }, ' (co-op). Di co-op kalian berdua satu tim melawan tim komputer pilihan tuan rumah; tiap orang memegang satu pemain (penanda kuning = tuan rumah, biru = tamu), tombol GANTI memilih pemain lain yang tidak sedang dipegang temanmu, dan operan ke pemain temanmu tetap jadi miliknya.']);
-    var sP = sect(box, 'Mode Liga Pro');
-    para(sP, ['Di pengaturan laga pilih ', { b: 'Aturan main → Liga Pro' }, ': lapangan Ukuran Asli 11 vs 11 di ', { b: 'Stadion Kabupaten' }, ' dengan aturan sepak bola resmi — ', { b: 'offside' }, ' (umpan ke kawan yang berdiri di depan bek terakhir), ', { b: 'pelanggaran = tendangan bebas' }, ' (lawan mundur 9,15 m), ', { b: 'pelanggaran di kotak = penalti' }, ', ', { b: 'kartu kuning & merah' }, ' (dua kuning = diusir, tim main dengan sepuluh orang), lemparan ke dalam, sepak pojok, dan tendangan gawang. Laga dibagi ', { b: 'dua babak' }, ': saat turun minum kedua tim ', { b: 'bertukar sisi lapangan' }, ' dan babak kedua dimulai oleh tim yang tidak menendang pertama. Kiper ', { b: 'tidak boleh menangkap back-pass' }, ' (operan kaki dari rekan) dan harus memainkannya dengan kaki. Aturan kampung (3 pojok = penalti, bola panas) otomatis mati. Mode ', { b: 'Tarkam' }, ' memakai aturan kampung tanpa offside.']);
-    var sJ = sect(box, 'Jenis tim');
-    para(sJ, ['Di ', { b: 'Tim Saya' }, ' kamu bisa memilih jenis anggota tim: ', { b: 'Warga Kampung' }, ', ', { b: 'Siluman' }, ' (genderuwo, buto ijo, siluman ular, babi, tuyul), ', { b: 'Hantu' }, ' (kuntilanak, pocong, sundel bolong, wewe, jin), ', { b: 'Binatang Mamalia' }, ', ', { b: 'Robot Mekanik' }, ', ', { b: 'Pekerja Migas' }, ' bercoverall dengan pilihan helm/kacamata safety, dan ', { b: 'Orang Partai' }, '. Tiap jenis punya suara khas saat menendang, menekel, dan mencetak gol. Lawan NPC baru: Siluman Alas Roban, Hantu Rumah Kosong, Satwa Rimba Raya, Robot Pabrik Baja, Rig Lepas Pantai, dan Partai Bola Rakyat.']);
-    para(sN, ['Pilih ukuran lapangan sebelum bertanding: ', { b: 'Kampung 5 vs 5' }, ', ', { b: 'Desa 7 vs 7' }, ', atau ', { b: 'Ukuran Asli 11 vs 11' }, ' (105×68 m). Di lapangan besar muncul peta mini di kiri atas.']);
-    var s2 = sect(box, 'Kekuatan tendangan');
-    para(s2, ['Menang kalah ditentukan ', { b: 'kerasnya tendangan striker' }, ' melawan tenaga jurus kiper. Isi meter sampai zona hijau ', { b: 'PAS!' }, ' (85–100%) untuk bonus tenaga. Lewat 100% bola bisa melambung.']);
-    para(s2, ['Jarak ideal 8–12 meter. Terlalu dekat kiper menutup sudut, terlalu jauh kiper sempat bereaksi. Lawan yang menempel saat kamu menendang mengurangi tenaga.']);
-    para(s2, ['Tendangan langsung setelah menerima umpan memberi bonus ', { b: 'Kombinasi' }, ' +10%.']);
-    var s3 = sect(box, 'Jurus silat kiper');
-    para(s3, ['Kiper lawan otomatis memakai ilmu silat. Tiap kiper punya ', { b: '5 jurus untuk 5 arah' }, ' gawang; arah lain hanya tangkapan biasa yang lebih lemah. Jurus yang sudah terlihat akan tercatat di kotak bidikan, jadi kamu tahu arah yang lemah.']);
-    var s4 = sect(box, 'Semangat & Jurus Pamungkas');
-    para(s4, ['Bar ', { b: 'SEMANGAT' }, ' terisi dari umpan, rebutan, penyelamatan, dan saat kebobolan. Saat penuh, tendangan berikutnya jadi ', { b: 'Jurus Pamungkas' }, ': api lebih besar dan tenaga +28%.']);
-    var s5 = sect(box, 'Aturan kampung');
-    var ul = el('ul');
-    ['3 kali sepak pojok = penalti (mode Bola Keluar).', 'Bola panas: memegang bola lebih dari 6 detik membuat bola terlepas.', 'Gol Emas: bila skor sama, gol berikutnya menang.', 'Adu Penalti Api: 5 penendang per tim, lalu sudden death.'].forEach(function (t) { ul.appendChild(el('li', null, t)); });
-    s5.appendChild(ul);
-    var s6 = sect(box, 'Cuaca & bola');
-    var ul2 = el('ul');
-    D.WEATHERS.forEach(function (w) { var li = el('li'); li.appendChild(el('b', null, w.name + ': ')); li.appendChild(document.createTextNode(w.desc)); ul2.appendChild(li); });
-    D.BALLS.forEach(function (b) { var li = el('li'); li.appendChild(el('b', null, b.name + ': ')); li.appendChild(document.createTextNode(b.desc)); ul2.appendChild(li); });
-    s6.appendChild(ul2);
-    var s7 = sect(box, 'Main online');
-    var ol = el('ol', 'steps');
-    ['Pemilik game membagikan game ini ke akun Claude lawan (menu Bagikan → undang).', 'Kedua pemain membuka game dalam keadaan masuk akun dan online (WiFi sama atau berbeda).', 'Tuan rumah: Main Online → Buat Room. Muncul QR dan kode.', 'Lawan: Main Online → Gabung Room → foto QR (atau ketik kode) → Saya siap.', 'Tuan rumah menekan Mulai.'].forEach(function (t) { ol.appendChild(el('li', null, t)); });
-    s7.appendChild(ol);
   };
 
   /* ---------- pengaturan ---------- */
@@ -547,6 +539,10 @@
     if (keepScroll && document.activeElement && box.contains(document.activeElement)) fIdx = focusables(box).indexOf(document.activeElement);
     clear(box);
     var S = BA.App.settings, App = BA.App, In = BA.Input, N = BA.Narr;
+    // --- bahasa ---
+    var sl = sect(box, 'Bahasa / Language');
+    chipRow(sl, [{ id: 'id', n: 'Bahasa Indonesia' }, { id: 'en', n: 'English' }], BA.I18n ? BA.I18n.lang : 'id', function (v) { UI.setLang(v); });
+    sl.appendChild(el('p', 'hint', 'Mengubah bahasa menu, tombol, dan komentator sekaligus. Bahasa komentator masih bisa diatur terpisah di bawah.'));
     // --- narator ---
     var sn = sect(box, 'Narator pertandingan');
     sn.appendChild(el('p', 'hint', 'Komentator ikut mengomentari laga dengan seru dan sedikit kocak. Suara memakai mesin suara bawaan perangkat.'));
@@ -570,10 +566,10 @@
           sn.appendChild(rb);
         } else {
           var hv = el('h3', null, 'Suara mesin bicara perangkat'); hv.style.marginTop = '6px'; sn.appendChild(hv);
-          sn.appendChild(el('p', 'hint', 'Dipakai sekarang: ' + (N.voiceLabel() || '—') + '. Nada & tempo diubah mengikuti narator yang dipilih. Suara berlabel Natural/Enhanced/Google terdengar paling alami.'));
+          sn.appendChild(el('p', 'hint', T('Dipakai sekarang: {0}. Nada & tempo diubah mengikuti narator yang dipilih. Suara berlabel Natural/Enhanced/Google terdengar paling alami.', N.voiceLabel() || '—')));
           var vitems = [{ id: '', n: 'Otomatis (cocokkan narator)' }].concat(vl.slice(0, 10).map(function (v) { return { id: v.voiceURI, n: String(v.name || v.lang).replace(/^(Microsoft|Google)\s+/i, '').slice(0, 30) }; }));
           chipRow(sn, vitems, S.nVoiceURI || '', function (v) { App.setSetting('nVoiceURI', v); UI.openSettings(true); });
-          if (vl.length < 2) sn.appendChild(el('p', 'hint', 'Ingin suara lebih alami atau beda tiap narator? ' + N.voiceHelp(S.nLang)));
+          if (vl.length < 2) sn.appendChild(el('p', 'hint', T('Ingin suara lebih alami atau beda tiap narator?') + ' ' + N.voiceHelp(S.nLang)));
         }
         var hvol = el('h3', null, 'Volume & kecepatan'); hvol.style.marginTop = '6px'; sn.appendChild(hvol);
         chipRow(sn, [{ id: 0.5, n: 'Pelan' }, { id: 0.8, n: 'Sedang' }, { id: 1, n: 'Keras' }], S.nVol, function (v) { App.setSetting('nVol', Number(v)); });
@@ -594,6 +590,13 @@
     frow.appendChild(fb); sc.appendChild(frow);
     if (UI.FS.ua().standalone) sc.appendChild(el('p', 'hint ok', 'Game berjalan sebagai aplikasi layar utama: sudah tampil penuh.'));
     else if (!UI.fsSupported()) sc.appendChild(el('p', 'hint warn', (UI.FS.ua().ios || UI.FS.ua().ipad) ? 'iPhone/iPad: buka game di tab sendiri lalu "Tambah ke Layar Utama" agar tampil penuh tanpa bilah alamat.' : 'Layar penuh tidak diizinkan di jendela ini. Buka game di tab sendiri (tombol ⛶ di pojok menjelaskan caranya) atau tekan F11 di PC.'));
+    var he = el('h3', null, 'Mode kontrol'); he.style.marginTop = '6px'; sc.appendChild(he);
+    chipRow(sc, [{ id: 1, n: 'Mudah' }, { id: 0, n: 'Mahir' }], S.easy ? 1 : 0, function (v) { App.setSetting('easy', Number(v) === 1); UI.openSettings(true); });
+    sc.appendChild(el('p', 'hint', S.easy ? 'Mudah: cukup ketuk tombol. Tenaga tendangan dan arah gawang dipilih otomatis; menahan tombol tetap bisa untuk mengatur tenaga sendiri.' : 'Mahir: tahan tombol untuk mengisi tenaga dan arahkan sendiri sasaran di gawang. Ketukan singkat menghasilkan tendangan lemah.'));
+    var hps = el('h3', null, 'Jumlah tombol aksi'); hps.style.marginTop = '6px'; sc.appendChild(hps);
+    chipRow(sc, [{ id: 'full', n: 'Lengkap (8 tombol)' }, { id: 'simple', n: 'Ringkas (5 tombol)' }], S.padSet, function (v) { App.setSetting('padSet', v); UI.openSettings(true); });
+    sc.appendChild(el('p', 'hint', S.padSet === 'simple' ? 'Ringkas: TENDANG, OPER, GOCEK/REBUT, LARI, GANTI. Tendangan jauh, cungkil, dan umpan lambung disembunyikan.' : 'Lengkap: TENDANG (jurus), JAUH, CUNGKIL, OPER, LAMBUNG, GOCEK/REBUT, LARI, GANTI.'));
+    toggle(sc, 'Tampilkan kondisi pemain (bugar / lelah / lemah / cedera) saat bermain', S.fitHud, function (v) { App.setSetting('fitHud', v); });
     var hk = el('h3', null, 'Tombol di layar'); hk.style.marginTop = '6px'; sc.appendChild(hk);
     chipRow(sc, [{ id: 'auto', n: 'Otomatis' }, { id: 'on', n: 'Selalu tampil' }, { id: 'off', n: 'Sembunyikan' }], S.touchUi, function (v) { App.setSetting('touchUi', v); });
     toggle(sc, 'Sprint otomatis saat joystick layar didorong penuh', S.autoSprint, function (v) { App.setSetting('autoSprint', v); });
@@ -607,7 +610,7 @@
       lrow.appendChild(lb);
     }
     sc.appendChild(lrow);
-    sc.appendChild(el('p', 'hint', S.layout ? 'Posisi tombol sudah kamu atur sendiri (' + Object.keys(S.layout).map(BA.Layout.orientName).join(' & ') + '). Buka kunci untuk menggeser lagi.' : 'Buka kunci untuk menggeser tombol tendang, oper, gocek, ganti, sprint, dan area joystick, lalu kunci lagi agar tersimpan. Potret dan lanskap diatur terpisah.'));
+    sc.appendChild(el('p', 'hint', S.layout ? T('Posisi tombol sudah kamu atur sendiri ({0}). Buka kunci untuk menggeser lagi.', Object.keys(S.layout).map(BA.Layout.orientName).join(' & ')) : 'Buka kunci untuk menggeser tombol tendang, oper, gocek, ganti, sprint, dan area joystick, lalu kunci lagi agar tersimpan. Potret dan lanskap diatur terpisah.'));
     toggle(sc, 'Petunjuk tombol keyboard/stik di layar', S.legend, function (v) { App.setSetting('legend', v); });
     var hm = el('h3', null, 'Peta mini'); hm.style.marginTop = '6px'; sc.appendChild(hm);
     chipRow(sc, [{ id: 'auto', n: 'Lapangan besar saja' }, { id: 'on', n: 'Selalu' }, { id: 'off', n: 'Mati' }], S.minimap, function (v) { App.setSetting('minimap', v); });
@@ -620,7 +623,7 @@
     sk.appendChild(rk);
     // --- stik ---
     var sp = sect(box, 'Stik PS / gamepad');
-    var info = In.padId ? 'Terhubung: ' + U.cleanText(In.padId, 60) : (In.padErr ? 'Stik tidak bisa dibaca di tampilan ini. Coba buka game di tab penuh.' : 'Belum ada stik. Sambungkan stik PS (kabel USB atau Bluetooth) lalu tekan salah satu tombolnya.');
+    var info = In.padId ? T('Terhubung: {0}', U.cleanText(In.padId, 60)) : (In.padErr ? 'Stik tidak bisa dibaca di tampilan ini. Coba buka game di tab penuh.' : 'Belum ada stik. Sambungkan stik PS (kabel USB atau Bluetooth) lalu tekan salah satu tombolnya.');
     sp.appendChild(el('p', 'hint' + (In.padId ? ' ok' : ''), info));
     sp.appendChild(el('p', 'hint', 'Stik analog kiri selalu untuk bergerak. Di menu: D-pad/analog untuk pindah, ✕ pilih, ○ kembali, OPTIONS jeda.'));
     bindTable(sp, 'pad');
@@ -671,7 +674,7 @@
         var name = kind === 'key' ? In.keyName(cur) : In.padName(cur);
         var b = el('button', 'bk' + ((kind === 'key' ? !cur : cur < 0) ? ' empty' : ''), name);
         b.type = 'button';
-        b.setAttribute('aria-label', a.n + ' tombol ' + (slot + 1) + ': ' + name);
+        b.setAttribute('aria-label', T('{0} tombol {1}: {2}', a.n, slot + 1, name));
         b.addEventListener('click', function () {
           click();
           if (In.cap && In.cap.action === a.id && In.cap.slot === slot && In.cap.kind === kind) { In.cancelCapture(); return; }
@@ -680,7 +683,7 @@
           In.capture(kind, a.id, slot, function (res) {
             if (res) {
               App.setSetting(kind === 'key' ? 'keys' : 'pad', kind === 'key' ? In.keys : In.pad);
-              if (res.moved) { var mv = In.ACTIONS.filter(function (x) { return x.id === res.moved; })[0]; UI.toast('Tombol dipindah dari "' + (mv ? mv.n : res.moved) + '"'); }
+              if (res.moved) { var mv = In.ACTIONS.filter(function (x) { return x.id === res.moved; })[0]; UI.toast(T('Tombol dipindah dari "{0}"', mv ? mv.n : res.moved)); }
             }
             if (UI.cur === 'scrSettings') UI.openSettings(true);
           });
@@ -766,7 +769,7 @@
     if (box._k === key) return;
     box._k = key; clear(box);
     if (dev !== 'kb' && dev !== 'pad') return;
-    [['pass', 'Oper datar'], ['lob', 'Oper lambung'], ['shoot', 'Tendang'], ['gocek', 'Gocek / rebut'], ['switch', 'Ganti'], ['sprint', 'Sprint'], ['skip', 'Lewati']].forEach(function (r) {
+    [['pass', 'Oper datar'], ['lob', 'Umpan lambung'], ['shoot', 'Tendang jurus'], ['long', 'Tendangan jauh'], ['chip', 'Cungkil'], ['gocek', 'Gocek / rebut'], ['switch', 'Ganti'], ['sprint', 'Lari'], ['skip', 'Lewati']].forEach(function (r) {
       var v = dev === 'kb' ? In.keys[r[0]][0] || In.keys[r[0]][1] : (In.pad[r[0]][0] >= 0 ? In.pad[r[0]][0] : In.pad[r[0]][1]);
       var nm = dev === 'kb' ? In.keyName(v) : In.padName(v);
       if (!v && v !== 0 || nm === '—') return;
@@ -779,22 +782,22 @@
     var box = $('resultBody'); clear(box);
     var fin = el('div', 'final');
     var w = sum.wn;
-    var whoTxt = w < 0 ? 'Seri!' : (teams[w].name + (w === my ? ' menang!' : ' menang'));
+    var whoTxt = w < 0 ? 'Seri!' : T(w === my ? '{0} menang!' : '{0} menang', teams[w].name);
     if (title) whoTxt = title;
     fin.appendChild(el('div', 'who', whoTxt));
     fin.appendChild(el('div', 'score', sum.sc[0] + ' – ' + sum.sc[1]));
     var line = el('div', 'pen', teams[0].name + '  vs  ' + teams[1].name);
     fin.appendChild(line);
-    if (sum.so) fin.appendChild(el('div', 'pen', 'Adu penalti: ' + sum.so[0].split('').reduce(function (a, v) { return a + Number(v); }, 0) + ' – ' + sum.so[1].split('').reduce(function (a, v) { return a + Number(v); }, 0)));
+    if (sum.so) fin.appendChild(el('div', 'pen', T('Adu penalti: {0} – {1}', sum.so[0].split('').reduce(function (a, v) { return a + Number(v); }, 0), sum.so[1].split('').reduce(function (a, v) { return a + Number(v); }, 0))));
     box.appendChild(fin);
     if (sum.goals && sum.goals.length) {
       var sg = sect(box, 'Pencetak gol'); var gl = el('div', 'goalList'); sg.appendChild(gl);
       sum.goals.forEach(function (g) {
-        var r = el('div'); var who = el('b', null, U.cleanText(String(g[1]), 14) + (g[3] ? ' (bunuh diri)' : ''));
+        var r = el('div'); var who = el('b', null, U.cleanText(String(g[1]), 14) + (g[3] ? ' ' + T('(bunuh diri)') : ''));
         who.style.color = teams[g[0] | 0] ? teams[g[0] | 0].c1 : '';
         if (U.lum(who.style.color || '#ffffff') < 0.25) who.style.color = '';
         r.appendChild(who);
-        r.appendChild(el('span', null, (g[2] ? U.cleanText(String(g[2]), 20) : 'Bola liar') + ' · ' + U.fmtTime(g[4] | 0)));
+        r.appendChild(el('span', null, T(g[2] ? U.cleanText(String(g[2]), 20) : 'Bola liar') + ' · ' + U.fmtTime(g[4] | 0)));
         gl.appendChild(r);
       });
     }
@@ -809,7 +812,7 @@
     });
     if (sum.best) {
       var sb = sect(box, 'Tendangan terkeras');
-      sb.appendChild(el('p', 'hint', U.cleanText(String(sum.best[1]), 14) + ' · ' + U.cleanText(String(sum.best[2]), 20) + ' · tenaga ' + (sum.best[0] | 0)));
+      sb.appendChild(el('p', 'hint', U.cleanText(String(sum.best[1]), 14) + ' · ' + T(U.cleanText(String(sum.best[2]), 20)) + ' · ' + T('tenaga {0}', sum.best[0] | 0)));
     }
     var act = $('resultActions'); clear(act);
     actions.forEach(function (a) { var b = el('button', 'btn' + (a.main ? ' main' : ''), a.label); b.type = 'button'; b.addEventListener('click', function () { click(); a.fn(); }); act.appendChild(b); });
@@ -883,8 +886,8 @@
     $('sems').style.visibility = st.mode === 'practice' ? 'hidden' : 'visible';
     // info kanan atas
     var info = (st.weather ? st.weather.name : '') + ' · ' + (st.ballDef ? st.ballDef.name : '');
-    if (st.rules && st.rules.bound === 'keluar' && st.rules.tigaPojok && st.mode === 'match') info += ' · Pojok ' + st.corners[0] + '–' + st.corners[1];
-    if (st.mode === 'practice' && st.practice) info = 'Tendangan ' + st.practice.n + ' · Gol ' + st.practice.goals;
+    if (st.rules && st.rules.bound === 'keluar' && st.rules.tigaPojok && st.mode === 'match') info += ' · ' + BA.t('Pojok {0}–{1}', st.corners[0], st.corners[1]);
+    if (st.mode === 'practice' && st.practice) info = BA.t('Tendangan {0} · Gol {1}', st.practice.n, st.practice.goals);
     setText('hudInfo', info);
     // pemain aktif
     var me = opts.me !== undefined ? opts.me : (my >= 0 ? st.active[my] : null);
@@ -893,6 +896,9 @@
       setText('meName', me.name + ' · ' + me.num);
       setText('meShot', me.shot ? me.shot.name : '');
       setStyle('meStam', 'width', Math.round(U.num(me.stamina, 100)) + '%');
+      var mf = D.fitOf(U.num(me.energy, 100), !!me.injured);
+      setText('meFit', st.mode === 'match' ? ((me.injured ? '✚ ' : '') + (BA.t ? BA.t(mf.n) : mf.n) + ' ' + Math.round(U.num(me.energy, 100)) + '%') : '');
+      setStyle('meFit', 'color', mf.c);
       setStyle('me', 'visibility', 'visible');
     } else setStyle('me', 'visibility', 'hidden');
     // tali adu penalti
@@ -917,9 +923,13 @@
     var penNow = st.phase === 'pen' || st.mode === 'penalty' || st.mode === 'practice';
     setClass('controls', 'penMode', st.phase === 'pen' || st.mode === 'penalty');
     setClass('bShoot', 'off', penNow && !!st.pen && st.pen.team !== my);
-    // cincin tenaga tombol oper / lambung
+    /* tombol yang hanya berguna saat memegang bola diredupkan ketika bola tidak di kaki */
+    var gkMine = !!(st.ball && st.ball.owner && st.ball.owner.team === my && st.ball.owner.gkHold);
+    setClass('bLong', 'dim', !hasBall); setClass('bChip', 'dim', !hasBall); setClass('bLob', 'dim', !hasBall);
+    setClass('bPass', 'dim', !hasBall && !gkMine); setClass('bShoot', 'dim', !hasBall && !gkMine && !penNow);
+    // cincin tenaga tombol oper / lambung / jauh / cungkil
     var In = BA.Input;
-    [['bPass', In && In.passChargeNow ? In.passChargeNow() : 0], ['bLob', In && In.lobChargeNow ? In.lobChargeNow() : 0]].forEach(function (r) {
+    [['bPass', In && In.passChargeNow ? In.passChargeNow() : 0], ['bLob', In && In.lobChargeNow ? In.lobChargeNow() : 0], ['bLong', In && In.longChargeNow ? In.longChargeNow() : 0], ['bChip', In && In.chipChargeNow ? In.chipChargeNow() : 0]].forEach(function (r) {
       var e = $(r[0]); if (!e) return;
       var c = r[1];
       if (c > 0) { e.classList.add('charging'); e.style.setProperty('--ch', String(Math.min(1, c / 1.2))); e.classList.toggle('full', c >= 1.15); }
@@ -937,11 +947,25 @@
   /* kilatan layar singkat (ledakan api, gol) */
   UI.flash = function (col, ms, peak) {
     var f = $('flash'); if (!f) return;
+    if (typeof col === 'number') { peak = col; col = '#ffffff'; ms = ms || 350; }
     try { if (root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches) return; } catch (e) { /* abaikan */ }
     f.style.transition = 'none'; f.style.background = col || '#ffffff'; f.style.opacity = String(peak == null ? 0.5 : peak);
     f.hidden = false;
     if (UI._flashT) clearTimeout(UI._flashT);
     UI._flashT = setTimeout(function () { f.style.transition = 'opacity ' + (ms || 180) + 'ms ease-out'; f.style.opacity = '0'; UI._flashT = setTimeout(function () { f.hidden = true; }, (ms || 180) + 40); }, 16);
+  };
+  /* garis kejut ala komik (gambar Higgsfield) sesaat ketika jurus meledak / gol */
+  UI.impact = function (ms) {
+    var f = $('impact'); if (!f) return;
+    try { if (root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches) return; } catch (e) { /* abaikan */ }
+    if (!f._img && BA.FXTex) { f._img = 1; f.style.backgroundImage = 'url("' + BA.FXTex.url('lines') + '")'; }
+    f.style.transition = 'none'; f.style.opacity = '0.85'; f.style.transform = 'scale(1.0)';
+    f.hidden = false;
+    if (UI._impT) clearTimeout(UI._impT);
+    UI._impT = setTimeout(function () {
+      f.style.transition = 'opacity ' + (ms || 200) + 'ms ease-out, transform ' + (ms || 200) + 'ms ease-out'; f.style.opacity = '0'; f.style.transform = 'scale(1.18)';
+      UI._impT = setTimeout(function () { f.hidden = true; }, (ms || 200) + 40);
+    }, 30);
   };
   UI.toast = function (text) {
     var host = $('toastHost'); if (!host) return;
@@ -991,7 +1015,7 @@
     if (o.ult) w.appendChild(el('span', 'badge', 'PAMUNGKAS'));
     if (o.perfect) w.appendChild(el('span', 'badge p', 'PAS!'));
     if (o.combo) w.appendChild(el('span', 'badge c', 'KOMBINASI'));
-    w.appendChild(document.createTextNode(o.shooter + (o.pen ? ' · penalti' : '')));
+    w.appendChild(document.createTextNode(o.shooter + (o.pen ? ' · ' + T('penalti') : '')));
     a.appendChild(w);
     a.appendChild(el('div', 'what', o.shot + '!'));
     $('cineAtt').appendChild(a);
@@ -1029,11 +1053,6 @@
   };
   UI.cineEnd = function () { $('cine').hidden = true; $('play').classList.remove('cine-on'); clear($('cineRes')); clear($('cineClash')); UI._clash = null; };
   UI.cineAttFade = function () { var a = $('cineAtt').firstChild; if (a) a.classList.add('fade'); };
-  UI.flash = function (v) {
-    var f = $('flash'); if (!f) return;
-    f.style.transition = 'none'; f.style.opacity = String(v);
-    requestAnimationFrame(function () { f.style.transition = 'opacity 0.35s'; f.style.opacity = '0'; });
-  };
 
   UI.loading = function (msg, show) {
     var l = $('loading'); if (!l) return;

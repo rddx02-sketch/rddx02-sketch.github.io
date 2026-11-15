@@ -27,7 +27,14 @@
     aspal: { base: '#5a5d63', a: '#64676d', b: '#4f5258', worn: '#46484d', out: '#76787c', line: '#f5f1e6', det: 'asphalt' },
     tanah: { base: '#8b6a45', a: '#9b7a52', b: '#7a5c3a', worn: '#6e5234', out: '#6f6a40', line: '#f6f1e3', det: 'dirt' },
     stadion: { base: '#3f8a35', a: '#4d9c41', b: '#357a2d', worn: '#4a8a3a', out: '#2f6a2a', line: '#ffffff', det: 'grass', neat: true },
-    salju: { base: '#eef2f6', a: '#e6ebf0', b: '#dde3e9', worn: '#cfd6dd', out: '#e9edf1', line: '#e0512f', det: 'sand', neat: true, snow: true }
+    salju: { base: '#eef2f6', a: '#e6ebf0', b: '#dde3e9', worn: '#cfd6dd', out: '#e9edf1', line: '#e0512f', det: 'sand', neat: true, snow: true },
+    /* permukaan arena baru */
+    batu: { base: '#8f897d', a: '#9d978a', b: '#7e786d', worn: '#6d685f', out: '#7a756b', line: '#f6f0de', det: 'stone', hard: true },
+    papan: { base: '#a67f55', a: '#b89166', b: '#936d47', worn: '#80603e', out: '#7a5c3d', line: '#fdf8ec', det: 'wood', hard: true },
+    abu: { base: '#4b4744', a: '#5a5551', b: '#3e3a37', worn: '#302d2b', out: '#2b2826', line: '#ffdca8', det: 'ash', hard: true },
+    karet: { base: '#2f6f9f', a: '#3a7fb2', b: '#28608c', worn: '#2a6795', out: '#4a4d54', line: '#ffffff', det: 'rubber', neat: true, edge: '#b4493d' },
+    vinil: { base: '#24705f', a: '#2c7f6c', b: '#1f6354', worn: '#2a8776', out: '#8b6f4d', line: '#ffffff', det: 'vinyl', neat: true, edge: '#d2803a' },
+    baja: { base: '#6c767f', a: '#7b868f', b: '#5e6870', worn: '#535c63', out: '#58616a', line: '#ffe14d', det: 'metal', hard: true }
   };
 
   function timeOf(arena, weather) {
@@ -111,8 +118,20 @@
         for (i = 0; i < 9000; i++) { var s = Math.round(90 + rnd() * 90); x.fillStyle = 'rgb(' + s + ',' + s + ',' + s + ')'; x.fillRect(rnd() * N, rnd() * N, 1, 1); }
         x.strokeStyle = 'rgba(160,160,160,0.35)'; x.lineWidth = 2;
         for (i = 0; i < 9; i++) { var yy = i * N / 9 + rnd() * 6; x.beginPath(); for (var k = 0; k <= 16; k++) x.lineTo(k * N / 16, yy + Math.sin(k * 0.8 + i) * 4); x.stroke(); }
-      } else if (kind === 'concrete' || kind === 'asphalt') {
-        var n2 = kind === 'asphalt' ? 7000 : 4500;
+      } else if (kind === 'wood' || kind === 'metal') {
+        /* serat kayu / goresan baja memanjang */
+        for (i = 0; i < 1500; i++) {
+          var wy = rnd() * N, wx = rnd() * N, wl = 18 + rnd() * 90, wv = Math.round(92 + rnd() * 76);
+          x.strokeStyle = 'rgba(' + wv + ',' + wv + ',' + wv + ',0.5)'; x.lineWidth = 0.6 + rnd();
+          x.beginPath(); x.moveTo(wx, wy); x.lineTo(wx + wl, wy + (rnd() - 0.5) * 2); x.stroke();
+          if (wx + wl > N) { x.beginPath(); x.moveTo(wx - N, wy); x.lineTo(wx - N + wl, wy); x.stroke(); }
+        }
+        if (kind === 'metal') for (i = 0; i < 900; i++) { var mv = Math.round(110 + rnd() * 70); x.fillStyle = 'rgb(' + mv + ',' + mv + ',' + mv + ')'; x.fillRect(rnd() * N, rnd() * N, 1.5, 1.5); }
+      } else if (kind === 'rubber' || kind === 'vinyl') {
+        var nr = kind === 'rubber' ? 8000 : 2600;
+        for (i = 0; i < nr; i++) { var rv = Math.round(108 + rnd() * 44); x.fillStyle = 'rgb(' + rv + ',' + rv + ',' + rv + ')'; x.fillRect(rnd() * N, rnd() * N, 1, 1); }
+      } else if (kind === 'concrete' || kind === 'asphalt' || kind === 'stone') {
+        var n2 = kind === 'asphalt' ? 7000 : (kind === 'stone' ? 5200 : 4500);
         for (i = 0; i < n2; i++) { var c2 = Math.round((kind === 'asphalt' ? 60 : 100) + rnd() * 110); x.fillStyle = 'rgb(' + c2 + ',' + c2 + ',' + c2 + ')'; var sz = kind === 'asphalt' ? 1 + rnd() * 2 : 1; x.fillRect(rnd() * N, rnd() * N, sz, sz); }
         x.strokeStyle = 'rgba(40,40,40,0.5)'; x.lineWidth = 1;
         for (i = 0; i < 5; i++) { var qx = rnd() * N, qy = rnd() * N; x.beginPath(); x.moveTo(qx, qy); for (var k2 = 0; k2 < 5; k2++) { qx += (rnd() - 0.5) * 50; qy += (rnd() - 0.5) * 50; x.lineTo(qx, qy); } x.stroke(); }
@@ -153,9 +172,91 @@
       } else if (surfKey === 'pasir') {
         x.strokeStyle = S.a; x.lineWidth = Math.max(1, s * 0.2);
         for (i = 0; i < 70; i++) { var yy = rnd() * h; x.beginPath(); x.moveTo(0, yy); x.bezierCurveTo(w * 0.3, yy + 8, w * 0.6, yy - 8, w, yy + 3); x.stroke(); }
+      } else if (surfKey === 'batu' || surfKey === 'baja') {
+        /* lempeng batu candi / pelat baja: kisi lempeng dengan rona berbeda dan nat gelap */
+        var pw = (surfKey === 'batu' ? 1.7 : 2.4) * s, ph2 = (surfKey === 'batu' ? 1.05 : 1.2) * s, row = 0, px2, py2;
+        for (py2 = 0; py2 < h; py2 += ph2, row++) {
+          for (px2 = -(row % 2) * pw / 2; px2 < w; px2 += pw) {
+            var tone = rnd();
+            x.fillStyle = tone < 0.34 ? S.a : (tone < 0.68 ? S.b : S.base);
+            x.globalAlpha = 0.55 + rnd() * 0.35; x.fillRect(px2, py2, pw, ph2); x.globalAlpha = 1;
+            if (surfKey === 'baja') {
+              x.fillStyle = 'rgba(30,34,38,0.55)';
+              for (var rc = 0; rc < 4; rc++) { x.beginPath(); x.arc(px2 + (rc % 2 ? 0.92 : 0.08) * pw, py2 + (rc < 2 ? 0.12 : 0.88) * ph2, Math.max(0.8, s * 0.035), 0, 6.3); x.fill(); }
+            }
+          }
+        }
+        x.strokeStyle = surfKey === 'batu' ? 'rgba(40,36,30,0.55)' : 'rgba(25,28,32,0.6)'; x.lineWidth = Math.max(1, s * (surfKey === 'batu' ? 0.05 : 0.035));
+        row = 0;
+        for (py2 = 0; py2 < h; py2 += ph2, row++) {
+          x.beginPath(); x.moveTo(0, py2); x.lineTo(w, py2); x.stroke();
+          for (px2 = -(row % 2) * pw / 2; px2 < w; px2 += pw) { x.beginPath(); x.moveTo(px2, py2); x.lineTo(px2, py2 + ph2); x.stroke(); }
+        }
+        if (surfKey === 'batu') { /* lumut di tepi pelataran */
+          for (i = 0; i < 60; i++) {
+            x.globalAlpha = 0.1 + rnd() * 0.16; x.fillStyle = '#5c7a3e';
+            var onLong = rnd() < 0.5, mx2 = onLong ? rnd() * w : (rnd() < 0.5 ? rnd() * 3 * s : w - rnd() * 3 * s), my2 = onLong ? (rnd() < 0.5 ? rnd() * 3 * s : h - rnd() * 3 * s) : rnd() * h;
+            x.beginPath(); x.ellipse(mx2, my2, (0.5 + rnd() * 1.6) * s, (0.3 + rnd()) * s, rnd() * 3, 0, 6.3); x.fill();
+          }
+          x.globalAlpha = 1;
+        } else { /* garis bahaya kuning-hitam di tepi geladak */
+          var hz = 0.6 * s, hn = Math.ceil((w + h) / hz);
+          x.save(); x.beginPath(); x.rect(0, 0, w, hz * 1.4); x.rect(0, h - hz * 1.4, w, hz * 1.4); x.rect(0, 0, hz * 1.4, h); x.rect(w - hz * 1.4, 0, hz * 1.4, h); x.clip();
+          x.fillStyle = '#e8c229'; x.fillRect(0, 0, w, h);
+          x.strokeStyle = '#1c1c1c'; x.lineWidth = hz * 0.55;
+          for (i = -hn; i < hn * 2; i++) { x.beginPath(); x.moveTo(i * hz * 1.6, 0); x.lineTo(i * hz * 1.6 - h, h); x.stroke(); }
+          x.restore();
+        }
+      } else if (surfKey === 'papan') {
+        /* papan dermaga memanjang: lebar 30 cm, sambungan selang-seling, paku */
+        var bw = 0.3 * s, r2 = 0;
+        for (var by = 0; by < h; by += bw, r2++) {
+          var tn = rnd();
+          x.fillStyle = tn < 0.3 ? S.a : (tn < 0.6 ? S.b : S.base); x.globalAlpha = 0.5 + rnd() * 0.4; x.fillRect(0, by, w, bw); x.globalAlpha = 1;
+          x.fillStyle = 'rgba(50,34,20,0.5)'; x.fillRect(0, by, w, Math.max(1, s * 0.025));
+          for (var bx2 = ((r2 * 37) % 100) / 100 * 4 * s; bx2 < w; bx2 += 4 * s) {
+            x.fillStyle = 'rgba(50,34,20,0.5)'; x.fillRect(bx2, by, Math.max(1, s * 0.03), bw);
+            x.fillStyle = 'rgba(30,22,14,0.7)'; x.fillRect(bx2 + s * 0.08, by + bw * 0.3, Math.max(1, s * 0.03), Math.max(1, s * 0.03)); x.fillRect(bx2 - s * 0.1, by + bw * 0.3, Math.max(1, s * 0.03), Math.max(1, s * 0.03));
+          }
+        }
+      } else if (surfKey === 'abu') {
+        /* abu vulkanik: gurat kelabu dan retakan bara di luar garis lapangan */
+        for (i = 0; i < 90; i++) { x.globalAlpha = 0.08 + rnd() * 0.12; x.fillStyle = rnd() < 0.5 ? '#77706a' : '#2a2725'; x.beginPath(); x.ellipse(rnd() * w, rnd() * h, (1 + rnd() * 5) * s, (0.3 + rnd() * 0.9) * s, (rnd() - 0.5) * 0.5, 0, 6.3); x.fill(); }
+        x.globalAlpha = 1;
+        for (i = 0; i < 26; i++) {
+          var cx2 = rnd() < 0.5 ? rnd() * 3.2 * s : w - rnd() * 3.2 * s, cy2 = rnd() * h;
+          if (rnd() < 0.5) { cx2 = rnd() * w; cy2 = rnd() < 0.5 ? rnd() * 3.2 * s : h - rnd() * 3.2 * s; }
+          x.strokeStyle = 'rgba(255,120,30,0.75)'; x.lineWidth = Math.max(1, s * 0.05); x.shadowColor = '#ff6a00'; x.shadowBlur = s * 0.25;
+          x.beginPath(); x.moveTo(cx2, cy2); for (var kk = 0; kk < 4; kk++) { cx2 += (rnd() - 0.5) * 1.6 * s; cy2 += (rnd() - 0.5) * 1.6 * s; x.lineTo(cx2, cy2); } x.stroke();
+        }
+        x.shadowBlur = 0;
+      } else if (surfKey === 'karet' || surfKey === 'vinil') {
+        /* lapangan futsal: bidang main satu warna, tepi luar warna lain, kotak penalti sedikit lebih terang */
+        x.fillStyle = S.edge; x.fillRect(0, 0, w, h);
+        x.fillStyle = S.base; x.fillRect(3.2 * s, 3.2 * s, w - 6.4 * s, h - 6.4 * s);
+        x.fillStyle = S.a; x.globalAlpha = 0.55;
+        x.fillRect(4 * s, (WW / 2 - F.boxW / 2) * s, F.boxL * s, F.boxW * s); x.fillRect((LW - 4 - F.boxL) * s, (WW / 2 - F.boxW / 2) * s, F.boxL * s, F.boxW * s);
+        x.beginPath(); x.arc(LW / 2 * s, WW / 2 * s, F.circle * s, 0, 6.3); x.fill();
+        x.globalAlpha = 1;
+        if (surfKey === 'vinil') {
+          /* garis cabang olahraga lain dan pantulan lampu langit-langit */
+          x.lineWidth = Math.max(1, s * 0.045);
+          x.strokeStyle = 'rgba(255,214,10,0.55)';
+          for (i = -1; i <= 1; i++) { var cxv = (LW / 2 + i * F.L * 0.28) * s; x.strokeRect(cxv - 3.05 * s, (WW / 2 - 6.7) * s, 6.1 * s, 13.4 * s); x.beginPath(); x.moveTo(cxv - 3.05 * s, WW / 2 * s); x.lineTo(cxv + 3.05 * s, WW / 2 * s); x.stroke(); }
+          x.strokeStyle = 'rgba(230,57,70,0.5)';
+          x.strokeRect((LW / 2 - Math.min(14, F.L * 0.3)) * s, (WW / 2 - Math.min(7.5, F.W * 0.27)) * s, Math.min(28, F.L * 0.6) * s, Math.min(15, F.W * 0.54) * s);
+          for (i = 0; i < 10; i++) {
+            var gxv = (4 + (i + 0.5) * F.L / 10) * s;
+            for (var gj = 0; gj < 3; gj++) {
+              var gyv = (4 + (gj + 0.5) * F.W / 3) * s, gr = x.createRadialGradient(gxv, gyv, 0, gxv, gyv, 2.6 * s);
+              gr.addColorStop(0, 'rgba(255,255,255,0.16)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+              x.fillStyle = gr; x.fillRect(gxv - 3 * s, gyv - 3 * s, 6 * s, 6 * s);
+            }
+          }
+        }
       }
       // bercak warna (stadion: rumput rapi, hampir tanpa bercak & area botak)
-      var nb = S.neat ? 20 : Math.round(200 * (F.L / 44));
+      var nb = S.neat ? (S.edge ? 0 : 20) : Math.round((S.hard ? 70 : 200) * (F.L / 44));
       for (i = 0; i < nb; i++) {
         x.globalAlpha = 0.12 + rnd() * 0.22;
         x.fillStyle = rnd() < 0.5 ? S.a : S.b;
@@ -164,16 +265,17 @@
       }
       // area botak: mulut gawang, titik penalti, lingkaran tengah, jalur sepanjang garis samping
       x.fillStyle = S.worn;
-      var spots = S.neat ? [] : [[4 + 1.6, WW / 2, 2.6], [LW - 5.6, WW / 2, 2.6], [4 + F.pen, WW / 2, 1.4], [LW - 4 - F.pen, WW / 2, 1.4], [LW / 2, WW / 2, F.circle * 0.6]];
+      /* lingkaran tengah hanya sedikit aus (dulu tampak seperti noda besar) */
+      var spots = S.neat ? [] : [[4 + 1.6, WW / 2, 2.6, 1], [LW - 5.6, WW / 2, 2.6, 1], [4 + F.pen, WW / 2, 1.4, 0.8], [LW - 4 - F.pen, WW / 2, 1.4, 0.8], [LW / 2, WW / 2, F.circle * 0.45, 0.4]];
       spots.forEach(function (c) {
         for (var j = 0; j < 22; j++) {
-          x.globalAlpha = 0.1 + rnd() * 0.18;
+          x.globalAlpha = (0.1 + rnd() * 0.18) * c[3] * (S.hard ? 0.6 : 1);
           x.beginPath(); x.ellipse(c[0] * s + (rnd() - 0.5) * c[2] * 2 * s, c[1] * s + (rnd() - 0.5) * c[2] * 2.4 * s, (0.6 + rnd() * c[2]) * s, (0.5 + rnd() * c[2] * 0.8) * s, rnd() * 3, 0, Math.PI * 2); x.fill();
         }
       });
-      x.globalAlpha = S.neat ? 0.03 : 0.12;
+      x.globalAlpha = S.neat ? (S.edge ? 0 : 0.03) : (S.hard ? 0.06 : 0.12);
       for (i = 0; i < 40; i++) { var tx = (4 + rnd() * F.L) * s; x.beginPath(); x.ellipse(tx, (4 + rnd() * 1.2) * s, 1.2 * s, 0.4 * s, 0, 0, 6.3); x.fill(); x.beginPath(); x.ellipse(tx, (WW - 4 - rnd() * 1.2) * s, 1.2 * s, 0.4 * s, 0, 0, 6.3); x.fill(); }
-      if (surfKey === 'semen' || surfKey === 'aspal' || surfKey === 'tanahmerah') {
+      if (surfKey === 'semen' || surfKey === 'aspal' || surfKey === 'tanahmerah' || surfKey === 'batu') {
         x.globalAlpha = 0.35; x.strokeStyle = 'rgba(0,0,0,0.6)'; x.lineWidth = 1.5;
         for (i = 0; i < 26; i++) { var px = rnd() * w, py = rnd() * h; x.beginPath(); x.moveTo(px, py); for (var k2 = 0; k2 < 5; k2++) { px += (rnd() - 0.5) * 40; py += (rnd() - 0.5) * 40; x.lineTo(px, py); } x.stroke(); }
       }
@@ -470,6 +572,28 @@
     }
   }
 
+  /* ---------- bendera sudut: tiang kuning dengan kain merah yang berkibar ---------- */
+  function buildCornerFlags(A) {
+    var poles = [], cloth = [], H = 1.5;
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (c) {
+      var x = c[0] * F.L / 2, z = c[1] * F.W / 2;
+      poles.push(tg(new THREE.CylinderGeometry(0.018, 0.022, H, 6), x, H / 2, z));
+      var fl = new THREE.BufferGeometry();
+      fl.setAttribute('position', new THREE.Float32BufferAttribute([0, H, 0, 0, H - 0.3, 0, 0.42, H - 0.15, 0], 3));
+      fl.setAttribute('normal', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1, 0, 0, 1], 3));
+      fl.setAttribute('uv', new THREE.Float32BufferAttribute([0, 1, 0, 0, 1, 0.5], 2));
+      cloth.push(tg(fl, x, 0, z, 0, c[0] > 0 ? Math.PI * 0.75 : Math.PI * 0.25, 0));
+    });
+    var pm = new THREE.Mesh(merge(poles), R3.mat('#f2d21b')); pm.castShadow = true; A.group.add(pm);
+    var cg = merge(cloth), cm = new THREE.Mesh(cg, R3.mat('#e02b2b', { side: 1 })); A.group.add(cm);
+    var base = cg.attributes.position.array.slice(0);
+    A.updaters.push(function (dt, t) {
+      var p = cg.attributes.position.array, wind = A.windMag || 1;
+      for (var i = 0; i < 4; i++) { var o = i * 9 + 6; p[o + 1] = base[o + 1] + Math.sin(t * 5 * wind + i * 1.7) * 0.05 * wind; p[o + 2] = base[o + 2] + Math.cos(t * 4 * wind + i) * 0.06 * wind; }
+      cg.attributes.position.needsUpdate = true;
+    });
+  }
+
   /* ---------- pagar ---------- */
   function buildFence(A, arena, rnd) {
     var G = A.group, style = arena.fence;
@@ -608,10 +732,10 @@
     var wz = (A.fenceZ || F.W / 2 + 1.15);
     var big = F.n >= 7;
     var benches = [];
-    var stadium = A.arena && A.arena.id === 'stadion';
+    var stadium = !!(A.arena && A.arena.stands);
     if (stadium) {
       n = Math.round(n * 2.2);
-      var SR = 10, z0 = wz + 3.2;
+      var SR = 10, z0 = wz + 3.2 + ((A.arena && A.arena.standGap) || 0);
       [-1, 1].forEach(function (k) { for (var r = 0; r < SR; r++) benches.push({ y: 0.55 + r * 0.55, z: k * (z0 + 0.5 + r * 1.0), k: k, L: F.L * 0.92 }); });
       A.standRows = { n: SR, z0: z0, step: 1.0, h: 0.55 };
     } else if (big) {
@@ -1513,14 +1637,14 @@
     var sunDir = new V3(T.sunPos[0], T.sunPos[1], T.sunPos[2]).normalize();
     var sunSpr = new THREE.Sprite(new THREE.SpriteMaterial({ map: R3.tex.glow, color: new THREE.Color(tk === 'malam' ? '#dfe6ff' : T.sun), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
     sunSpr.position.copy(sunDir).multiplyScalar(280); sunSpr.scale.setScalar(tk === 'malam' ? 18 : (tk === 'senja' ? 70 : 46));
-    if (!weather.rain && !weather.fog && !weather.snow) G.add(sunSpr);
-    if (tk === 'malam') {
+    if (!weather.rain && !weather.fog && !weather.snow && !arena.indoor) G.add(sunSpr);
+    if (tk === 'malam' && !arena.indoor) {
       var sn = q === 0 ? 150 : 400, sp = new Float32Array(sn * 3);
       for (var i = 0; i < sn; i++) { var th = rnd() * Math.PI * 2, ph = 0.08 + rnd() * 1.3; sp[i * 3] = Math.cos(th) * Math.cos(ph) * 300; sp[i * 3 + 1] = Math.sin(ph) * 300; sp[i * 3 + 2] = Math.sin(th) * Math.cos(ph) * 300; }
       var sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(sp, 3));
       G.add(new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAttenuation: false, fog: false })));
     }
-    clouds(A, rnd, T, tk, weather);
+    if (!arena.indoor) clouds(A, rnd, T, tk, weather);
 
     // ---- cahaya & bayangan ----
     A.hemi = new THREE.HemisphereLight(new THREE.Color(T.hs), new THREE.Color(T.hg), T.hi); G.add(A.hemi);
@@ -1551,11 +1675,13 @@
     var S = SURF[weather.snowGround ? 'salju' : arena.surface] || SURF.rumput;
     var outer = R3.mesh(arena.id === 'bukit' ? new THREE.CircleGeometry(Math.max(70, F.L * 0.8), 48) : new THREE.PlaneGeometry(800, 800), R3.mat(S.out), 0, -0.02, 0);
     outer.rotation.x = -Math.PI / 2; outer.receiveShadow = true; G.add(outer);
+    A.outer = outer; A.surf = S;
     buildField(A, S, weather.snowGround ? 'salju' : arena.surface, q);
     buildGoals(A, arena);
     buildFence(A, arena, rnd);
     buildBoards(A, rnd);
-    if (arena.id === 'kampung' || arena.id === 'rel' || arena.id === 'sawah' || arena.id === 'sekolah' || arena.id === 'alun') buildBunting(A, rnd, arena.id === 'sekolah' || arena.id === 'kampung' ? ['#e11d2e', '#ffffff'] : ['#e63946', '#ffbe0b', '#3a86ff', '#06d6a0', '#ffffff']);
+    buildCornerFlags(A);
+    if (arena.bunting) buildBunting(A, rnd, arena.id === 'sekolah' || arena.id === 'kampung' ? ['#e11d2e', '#ffffff'] : ['#e63946', '#ffbe0b', '#3a86ff', '#06d6a0', '#ffffff']);
     buildCrowd(A, rnd, q, tk);
     var deco = DECO[arena.id];
     if (deco) deco(A, rnd, q, tk);
@@ -1607,4 +1733,8 @@
 
   Arena.timeOf = timeOf;
   Arena.TIMES = TIMES;
+  /* dipakai js/arena2.js (dekorasi 10 arena tambahan) */
+  Arena.DECO = DECO; Arena.SURF = SURF;
+  Arena.H = { tg: tg, bar: bar, merge: merge, shared: shared, imat: imat, ibasic: ibasic, textTex: textTex, netTex: netTex, adTex: adTex, houses: houses, houseRow: houseRow, trees: trees, mountains: mountains,
+    treeLine: treeLine, flags: flags, banner: banner, motor: motor, warung: warung, lampPost: lampPost, powerLine: powerLine };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -172,7 +172,7 @@
   ];
   D.BODIES = [{ id: 'kurus', n: 'Kurus' }, { id: 'sedang', n: 'Sedang' }, { id: 'gempal', n: 'Gempal' }];
   D.FACES = [{ id: 'polos', n: 'Polos' }, { id: 'kumis', n: 'Kumis' }, { id: 'brewok', n: 'Brewok' }, { id: 'jenggot', n: 'Jenggot' }, { id: 'kacamata', n: 'Kacamata' }];
-  D.HEIGHTS = [{ id: 'pendek', n: 'Pendek' }, { id: 'sedang', n: 'Sedang' }, { id: 'tinggi', n: 'Tinggi' }];
+  D.HEIGHTS = [{ id: 'pendek', n: 'Pendek' }, { id: 'sedang', n: 'Sedang' }, { id: 'tinggi', n: 'Jangkung' }];
   D.ROLES = [{ id: 'GK', n: 'Kiper' }, { id: 'DF', n: 'Bek' }, { id: 'MF', n: 'Gelandang' }, { id: 'FW', n: 'Penyerang' }];
   D.OUTFITS = [{ id: 'jersey', n: 'Jersey Bola' }, { id: 'kaos', n: 'Kaos Seragam' }, { id: 'singlet', n: 'Kaos Singlet' }];
   D.PATTERNS = [{ id: 'polos', n: 'Polos' }, { id: 'tegak', n: 'Garis Tegak' }, { id: 'datar', n: 'Garis Datar' }, { id: 'belah', n: 'Belah Dua' }, { id: 'selempang', n: 'Selempang' }];
@@ -413,13 +413,20 @@
         P('Teguh', 3, 'DF', 'banteng', 'elang', 'sepatu', 4, 'botak', 0, 'ikat', 'gempal', 'tinggi', 'brewok'),
         P('Slamet', 5, 'DF', 'tinju', 'elang', 'sandal', 1, 'keriting', 0, 'none', 'sedang', 'sedang'),
         P('Joko', 10, 'MF', 'garuda', 'elang', 'sepatu', 2, 'kuncir', 0, 'none', 'kurus', 'tinggi', 'kacamata'),
-        P('Galih', 11, 'FW', 'meteor', 'elang', 'sepatu', 3, 'gondrong', 1, 'bandana', 'sedang', 'tinggi')]
+        P('Galih', 11, 'FW', 'meteor', 'elang', 'sepatu', 3, 'gondrong', 1, 'bandana', 'sedang', 'tinggi'),
+        P('Wahid', 12, 'MF', 'macan', 'elang', 'sepatu', 2, 'cepak', 0, 'none', 'sedang', 'sedang'),
+        P('Sigit', 13, 'DF', 'banteng', 'elang', 'sepatu', 3, 'botak', 0, 'none', 'gempal', 'tinggi', 'kumis'),
+        P('Rangga', 14, 'FW', 'garuda', 'elang', 'nyeker', 1, 'mohawk', 2, 'none', 'kurus', 'sedang'),
+        P('Hasan', 15, 'MF', 'beliung', 'elang', 'sandal', 4, 'keriting', 0, 'ikat', 'sedang', 'pendek'),
+        P('Ucok', 16, 'DF', 'tinju', 'elang', 'sepatu', 2, 'belah', 0, 'none', 'sedang', 'tinggi', 'brewok')]
     };
   };
 
-  D.MAX_SQUAD = 11;
-  /* kelompok pemain di editor: 5 inti, +2 untuk 7 vs 7, +4 untuk 11 vs 11 */
-  D.SQUAD_GROUPS = [{ from: 0, to: 5, n: 'Inti · main di semua lapangan' }, { from: 5, to: 7, n: 'Tambahan 7 vs 7' }, { from: 7, to: 11, n: 'Tambahan 11 vs 11' }];
+  D.MAX_SQUAD = 16;
+  D.BENCH = 5;       /* jumlah pemain cadangan yang dibawa ke tiap laga */
+  D.MAX_SUBS = 5;    /* batas pergantian pemain per laga */
+  /* kelompok pemain di editor: 5 inti, +2 untuk 7 vs 7, +4 untuk 11 vs 11, +5 cadangan */
+  D.SQUAD_GROUPS = [{ from: 0, to: 5, n: 'Inti · main di semua lapangan' }, { from: 5, to: 7, n: 'Tambahan 7 vs 7' }, { from: 7, to: 11, n: 'Tambahan 11 vs 11' }, { from: 11, to: 16, n: 'Cadangan 11 vs 11' }];
 
   /* susunan posisi (formasi) untuk n pemain berdasarkan peran; fx = jarak dari gawang sendiri (0..1), fz = sisi (-0.5..0.5) */
   D.formation = function (players) {
@@ -448,6 +455,14 @@
   D.KIND_IDS = KIND_IDS;
   function pickId(v, list, def) { return list.indexOf(v) >= 0 ? v : def; }
 
+  /* urutan pemain sah: permutasi 0..MAX_SQUAD-1 dengan kiper (0) di depan */
+  D.validOrder = function (l) {
+    if (!Array.isArray(l) || l.length !== D.MAX_SQUAD || l[0] !== 0) return false;
+    var seen = {};
+    for (var i = 0; i < l.length; i++) { var v = l[i]; if (typeof v !== 'number' || v !== Math.floor(v) || v < 0 || v >= D.MAX_SQUAD || seen[v]) return false; seen[v] = 1; }
+    return true;
+  };
+
   D.sanitizeTeam = function (t) {
     var d = D.defaultMyTeam();
     if (!t || typeof t !== 'object') return d;
@@ -459,6 +474,20 @@
       tactic: pickId(t.tactic, TAC_IDS, 'seimbang'), level: U.clamp(Math.round(U.num(t.level, 1)), 0, 2),
       kind: pickId(t.kind, KIND_IDS, 'manusia'), ppe: pickId(t.ppe, PPE_IDS, 'helm'), players: []
     };
+    if (typeof t.form === 'string' && /^[0-9-]{1,11}$/.test(t.form)) out.form = t.form;
+    if (t.autoSub) out.autoSub = true;
+    if (t.setup && typeof t.setup === 'object') {
+      var su = {}, any = false;
+      D.FIELDS.forEach(function (fd) {
+        var e = t.setup[fd.id];
+        if (!e || typeof e !== 'object') return;
+        var o2 = {};
+        if (typeof e.f === 'string' && /^[0-9-]{1,11}$/.test(e.f)) o2.f = e.f;
+        if (D.validOrder(e.l)) o2.l = e.l.slice(0, D.MAX_SQUAD);
+        if (o2.f || o2.l) { su[fd.id] = o2; any = true; }
+      });
+      if (any) out.setup = su;
+    }
     var kindDef = D.kindById[out.kind], VAR_IDS = kindDef.variants.map(function (v) { return v.id; });
     var src = Array.isArray(t.players) ? t.players : [];
     for (var i = 0; i < D.MAX_SQUAD; i++) {
@@ -528,6 +557,8 @@
     return {
       n: t.name, s: t.short, a: t.c1, b: t.c2, k: t.gk, o: OUT_IDS.indexOf(t.outfit), p: PAT_IDS.indexOf(t.pattern),
       w: BOT_IDS.indexOf(t.bottom), t: TAC_IDS.indexOf(t.tactic), l: t.level, K: KIND_IDS.indexOf(t.kind), E: PPE_IDS.indexOf(t.ppe),
+      F: t.form || '', A: t.autoSub ? 1 : 0,
+      S: t.setup ? D.FIELDS.map(function (fd) { var e = t.setup[fd.id]; return e ? [e.f || '', e.l ? e.l.join('.') : ''] : 0; }) : 0,
       P: t.players.map(function (p) {
         var vids = D.kindById[t.kind].variants.map(function (v) { return v.id; });
         return [p.name, p.num, ROLE_IDS.indexOf(p.role), SHOT_IDS.indexOf(p.shot), STYLE_IDS.indexOf(p.style), FOOT_IDS.indexOf(p.foot),
@@ -542,6 +573,19 @@
       name: o.n, short: o.s, c1: o.a, c2: o.b, gk: o.k, outfit: at(OUT_IDS, o.o), pattern: at(PAT_IDS, o.p), bottom: at(BOT_IDS, o.w),
       tactic: at(TAC_IDS, o.t), level: o.l, kind: at(KIND_IDS, o.K), ppe: at(PPE_IDS, o.E), players: []
     };
+    if (typeof o.F === 'string' && o.F) t.form = o.F;
+    if (o.A) t.autoSub = true;
+    if (Array.isArray(o.S)) {
+      t.setup = {};
+      D.FIELDS.forEach(function (fd, i) {
+        var e = o.S[i];
+        if (!Array.isArray(e)) return;
+        var o3 = {};
+        if (typeof e[0] === 'string' && e[0]) o3.f = e[0];
+        if (typeof e[1] === 'string' && e[1]) o3.l = e[1].split('.').map(function (x) { return parseInt(x, 10); });
+        t.setup[fd.id] = o3;
+      });
+    }
     var vids = D.kindById[t.kind].variants.map(function (v) { return v.id; });
     var P2 = Array.isArray(o.P) ? o.P : [];
     for (var i = 0; i < D.MAX_SQUAD; i++) {

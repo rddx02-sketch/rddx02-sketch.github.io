@@ -1,0 +1,133 @@
+/* Bola Api Arena — isi Panduan dalam dua bahasa.
+   Blok: { h } judul bagian, { keys: [[tombol, penjelasan], …] }, { p } paragraf (**tebal**), { hint }, { ul } / { ol } daftar,
+   { dyn: 'binds' } tabel tombol keyboard & stik, { dyn: 'weather' } daftar cuaca & bola. */
+(function (root) {
+  'use strict';
+  var BA = root.BA = root.BA || {};
+  BA.GUIDE = {
+    id: [
+      { h: 'Kontrol layar sentuh' },
+      { keys: [
+        ['Joystick kiri', 'Lari. Dorong penuh untuk sprint otomatis.'],
+        ['LARI', 'Tahan untuk lari kencang (stamina berkurang).'],
+        ['TENDANG', 'Tendangan jurus berapi dengan adegan duel melawan kiper. Mode Mudah: cukup ketuk, tenaga dan arah dipilih otomatis. Mode Mahir: tahan untuk mengisi tenaga, lepas untuk menendang; saat membidik, joystick memilih arah gawang.'],
+        ['JAUH', 'Tendangan keras dari jarak jauh langsung ke gawang, tanpa adegan. Makin dekat makin besar peluang gol. Ketuk = tenaga otomatis, tahan = atur tenaga sendiri. Di luar jangkauan gawang, bola ditendang panjang ke depan.'],
+        ['CUNGKIL', 'Bola dicungkil melambung melewati kiper. Paling ampuh saat kiper maju meninggalkan gawang. Di luar jangkauan jadi bola lambung ke depan.'],
+        ['OPER', 'Ketuk = umpan datar otomatis ke kawan di arah joystick. Tahan = operan lebih kencang mengikuti hadap badan pemain. Saat kiper memegang bola: lempar.'],
+        ['LAMBUNG', 'Umpan melambung lewat atas lawan. Tahan lebih lama = terbang lebih jauh. Kawan yang dituju otomatis berlari menjemput bola.'],
+        ['GOCEK / REBUT', 'Saat pegang bola: gocek mengecoh lawan. Tanpa bola: ketuk = tekel sapuan; tahan lama = pemain otomatis mengejar bola sambil sprint dan merebut saat dekat.'],
+        ['GANTI', 'Pindah ke pemain terdekat dengan bola.']
+      ] },
+      { hint: 'Tombol yang sedang tidak berguna tampak redup. Di Pengaturan → Kontrol kamu bisa memilih mode **Mudah** atau **Mahir**, set tombol **Lengkap (8)** atau **Ringkas (5)**, serta menggeser posisi dan ukuran tiap tombol.' },
+      { h: 'Keyboard & stik PS' },
+      { dyn: 'binds' },
+      { hint: 'Semua tombol bisa diubah di Pengaturan. Stik Xbox juga bisa: ✕=A, ○=B, □=X, △=Y, L1/R1=LB/RB.' },
+      { h: 'Strategi, formasi & pergantian pemain' },
+      { p: 'Buka **Strategi & Formasi** dari menu utama, dari layar atur pertandingan, atau saat laga lewat **Jeda → Strategi & ganti pemain**. Pilih **formasi** untuk tiap ukuran lapangan (misalnya 4-4-2, 4-3-3, atau 3-5-2 di 11 lawan 11; 2-2 atau 1-2-1 di 5 lawan 5) dan **taktik** tim: Seimbang, Serang Total, atau Gerendel.' },
+      { p: 'Di gambar lapangan, ketuk dua pemain untuk **bertukar posisi**. Ketuk pemain lalu pemain **cadangan** untuk menggantinya. Tiap tim punya 5 cadangan dan 5 kali pergantian per laga; pergantian dijalankan saat bola mati. Kiper tidak bisa diganti. Nyalakan **Ganti otomatis** bila ingin pemain cedera atau kehabisan tenaga diganti sendiri.' },
+      { h: 'Kondisi pemain: tenaga & cedera' },
+      { p: 'Tiap pemain punya **tenaga** yang turun selama laga, lebih cepat bila terus sprint atau saat cuaca berat. Strip kecil di kanan atas menampilkan kondisi semua pemainmu: **Bugar** (hijau), **Lelah** (kuning, lari mulai melambat), **Lemah** (jingga, lambat dan mudah cedera), dan **Cedera** (berkedip, pincang dan tidak bisa sprint).' },
+      { p: 'Pemain bisa cedera karena dilanggar, ditekel keras, atau dipaksa berlari saat tenaganya habis. Ketuk strip kondisi untuk langsung membuka layar pergantian. Turun minum memulihkan sedikit tenaga.' },
+      { h: 'Narator & bahasa' },
+      { p: 'Bahasa menu bisa **Bahasa Indonesia** atau **English**: pilih di menu utama atau di Pengaturan. Komentator pertandingan ikut berganti bahasa, lengkap dengan suara dan teks. Ada enam narator berlogat: **Koh Ahong** (Cina), **Mas Bejo** (Jawa), **Bang Togar** (Batak), **Kang Asep** (Sunda), **Encik Zul** (Melayu), dan **Mbak Rere** (wanita, Jakarta). Atur di Pengaturan → Narator.' },
+      { h: 'Lapangan & arena' },
+      { p: 'Pilih ukuran lapangan sebelum bertanding: **Kampung 5 vs 5**, **Desa 7 vs 7**, atau **Ukuran Asli 11 vs 11** (105×68 m). Di lapangan besar muncul peta mini di kiri atas.' },
+      { p: 'Ada **19 arena** yang semuanya bisa dipakai di ketiga ukuran lapangan: dari lapangan kampung, pasar malam, pelataran candi, kebun teh, dermaga nelayan, kawah gunung api, atap gedung, hutan bambu, GOR futsal dalam ruangan, anjungan lepas pantai, sampai stadion utama. Permukaan tiap arena mengubah laju dan pantulan bola.' },
+      { h: 'Main online sampai 8 pemain' },
+      { p: 'Sampai **8 orang** bisa bermain dalam satu room, masing-masing dari HP, tablet, atau PC sendiri. Tuan rumah bebas membagi tim: semua satu tim melawan NPC, 1 lawan 1, 2 lawan 2, 4 lawan 4, 3 lawan 5, dan seterusnya. Posisi yang tidak dipegang manusia dan kiper dijaga NPC. Tiap orang memegang satu pemain dan bisa pindah dengan GANTI ke pemain yang belum dipegang teman.' },
+      { ol: [
+        'Tuan rumah: Main Online → Buat Room. Muncul QR, kode room, dan tombol bagikan tautan.',
+        'Pemain lain: Main Online → Gabung Room, lalu pindai QR, buka tautan yang dibagikan, atau ketik kodenya.',
+        'Tiap tamu memilih Tim A atau Tim B (tuan rumah bisa memindahkan dengan mengetuk nama), lalu menekan Saya siap.',
+        'Tuan rumah menekan Mulai. Yang belum siap bisa ikut di laga berikutnya.'
+      ] },
+      { p: 'Pemain pertama di tiap tim adalah **kapten**: ia yang mengatur formasi, taktik, dan pergantian pemain timnya. Bila sinyal seorang pemain putus, pemainnya dipegang NPC dulu dan ia otomatis masuk lagi begitu tersambung. Jumlah manusia per tim paling banyak 4 di lapangan 5 vs 5, 6 di 7 vs 7, dan 10 di 11 vs 11.' },
+      { h: 'WiFi lokal / hotspot tanpa internet' },
+      { p: 'Di **Main Online → 📶 WiFi lokal**: semua HP di WiFi yang sama (atau satu HP menyalakan hotspot). Tuan rumah menekan **Buat kode undangan** lalu mengirim kodenya (QR, Bagikan ke WhatsApp/Bluetooth, atau salin). Tamu menempel atau memindai kode itu, menekan **Buat kode balasan**, dan mengirim balik. Tuan rumah menempel balasan → **Sambungkan**. Ulangi untuk tiap tamu berikutnya (sampai 7 tamu). Setelah itu pertandingan berjalan langsung antar HP tanpa server. Bluetooth sendiri tidak bisa dipakai browser untuk bermain, hanya untuk mengirim kodenya.' },
+      { h: 'Mode Liga Pro' },
+      { p: 'Di pengaturan laga pilih **Aturan main → Liga Pro**: aturan sepak bola resmi — **offside**, **pelanggaran = tendangan bebas** (lawan mundur 9,15 m), **pelanggaran di kotak = penalti**, **kartu kuning & merah** (dua kuning = diusir), lemparan ke dalam, sepak pojok, dan tendangan gawang. Laga dibagi **dua babak**: saat turun minum kedua tim bertukar sisi lapangan. Kiper **tidak boleh menangkap back-pass**. Aturan kampung (3 pojok = penalti, bola panas) otomatis mati. Mode **Tarkam** memakai aturan kampung tanpa offside.' },
+      { h: 'Jenis tim' },
+      { p: 'Di **Tim Saya** kamu bisa memilih jenis anggota tim: **Warga Kampung**, **Siluman**, **Hantu**, **Binatang Mamalia**, **Robot Mekanik**, **Pekerja Migas**, dan **Orang Partai**. Tiap jenis punya suara khas saat menendang, menekel, dan mencetak gol. Nama, nomor, wajah, dan kemampuan tiap pemain bisa kamu ubah sendiri, termasuk 5 pemain cadangan.' },
+      { p: 'Ada 13 tim lawan NPC, termasuk **Bintang Liburan**: tim bintang dunia rekaan yang sedang liburan di kampung.' },
+      { h: 'Kekuatan tendangan' },
+      { p: 'Pada tendangan jurus, menang kalah ditentukan **kerasnya tendangan striker** melawan tenaga jurus kiper. Isi meter sampai zona hijau **PAS!** (85–100%) untuk bonus tenaga. Lewat 100% bola bisa melambung.' },
+      { p: 'Jarak ideal 8–12 meter. Terlalu dekat kiper menutup sudut, terlalu jauh kiper sempat bereaksi. Lawan yang menempel saat kamu menendang mengurangi tenaga.' },
+      { p: 'Tendangan langsung setelah menerima umpan memberi bonus **Kombinasi** +10%.' },
+      { h: 'Jurus silat kiper' },
+      { p: 'Kiper lawan otomatis memakai ilmu silat. Tiap kiper punya **5 jurus untuk 5 arah** gawang; arah lain hanya tangkapan biasa yang lebih lemah. Jurus yang sudah terlihat akan tercatat di kotak bidikan, jadi kamu tahu arah yang lemah.' },
+      { h: 'Semangat & Jurus Pamungkas' },
+      { p: 'Bar **SEMANGAT** terisi dari umpan, rebutan, penyelamatan, dan saat kebobolan. Saat penuh, tendangan jurus berikutnya jadi **Jurus Pamungkas**: api lebih besar dan tenaga +28%.' },
+      { h: 'Aturan kampung' },
+      { ul: [
+        '3 kali sepak pojok = penalti (mode Bola Keluar).',
+        'Bola panas: memegang bola lebih dari 6 detik membuat bola terlepas.',
+        'Gol Emas: bila skor sama, gol berikutnya menang.',
+        'Adu Penalti Api: 5 penendang per tim, lalu sudden death.'
+      ] },
+      { h: 'Cuaca & bola' },
+      { dyn: 'weather' }
+    ],
+    en: [
+      { h: 'Touch controls' },
+      { keys: [
+        ['Left joystick', 'Run. Push it all the way for automatic sprint.'],
+        ['RUN', 'Hold to run fast (uses stamina).'],
+        ['SHOOT', 'A fiery special shot with a duel cutscene against the keeper. Easy mode: just tap; power and goal zone are picked for you. Expert mode: hold to charge, release to shoot; while aiming, the joystick picks the goal zone.'],
+        ['LONG', 'A hard shot from distance straight at goal, with no cutscene. The closer you are, the better the odds. Tap = automatic power, hold = set the power yourself. Out of range of the goal, the ball is cleared long upfield.'],
+        ['CHIP', 'The ball is chipped up and over the keeper. Best when the keeper has come off the line. Out of range it becomes a lofted ball forward.'],
+        ['PASS', 'Tap = automatic ground pass to the teammate in the joystick direction. Hold = a harder pass in the direction the player is facing. When the keeper holds the ball: throw.'],
+        ['LOB', 'A lofted pass over opponents. Hold longer = flies further. The targeted teammate runs to meet the ball automatically.'],
+        ['DRIBBLE / TACKLE', 'With the ball: a feint to beat an opponent. Without it: tap = sliding tackle; long hold = your player chases the ball at a sprint and wins it when close.'],
+        ['SWITCH', 'Switch to the player nearest the ball.']
+      ] },
+      { hint: 'Buttons that are not useful at the moment look dim. In Settings → Controls you can choose **Easy** or **Expert** mode, the **Full (8)** or **Compact (5)** button set, and move or resize every button.' },
+      { h: 'Keyboard & PS controller' },
+      { dyn: 'binds' },
+      { hint: 'Every button can be changed in Settings. Xbox controllers work too: ✕=A, ○=B, □=X, △=Y, L1/R1=LB/RB.' },
+      { h: 'Strategy, formation & substitutions' },
+      { p: 'Open **Strategy & Formation** from the main menu, from the match setup screen, or during a match via **Pause → Strategy & substitutions**. Choose a **formation** for each pitch size (for example 4-4-2, 4-3-3 or 3-5-2 in 11 a side; 2-2 or 1-2-1 in 5 a side) and the team **tactics**: Balanced, All-out Attack or Park the Bus.' },
+      { p: 'On the pitch diagram, tap two players to **swap positions**. Tap a player and then a **substitute** to replace them. Each team has 5 substitutes and 5 substitutions per match; substitutions take effect when the ball is dead. The keeper cannot be replaced. Turn on **Auto-sub** if you want injured or exhausted players replaced for you.' },
+      { h: 'Player condition: energy & injuries' },
+      { p: 'Every player has **energy** that drops during the match, faster with constant sprinting or in tough weather. The small strip at the top right shows all your players: **Fit** (green), **Tired** (yellow, starting to slow), **Weak** (orange, slow and easily injured) and **Injured** (blinking, limping and unable to sprint).' },
+      { p: 'Players can get injured when fouled, tackled hard, or forced to run on empty. Tap the condition strip to jump straight to the substitution screen. Half-time restores a little energy.' },
+      { h: 'Commentator & language' },
+      { p: 'The menus can be in **Bahasa Indonesia** or **English**: choose on the main menu or in Settings. The match commentator switches language too, with both voice and subtitles. In Indonesian there are six commentators with regional accents: **Koh Ahong** (Chinese-Indonesian), **Mas Bejo** (Javanese), **Bang Togar** (Batak), **Kang Asep** (Sundanese), **Encik Zul** (Malay) and **Mbak Rere** (female, Jakarta). Set it in Settings → Commentator.' },
+      { h: 'Pitches & arenas' },
+      { p: 'Pick a pitch size before the match: **Kampung 5 vs 5**, **Village 7 vs 7**, or **Full Size 11 vs 11** (105×68 m). A minimap appears at the top left on the large pitches.' },
+      { p: 'There are **19 arenas**, and every one works with all three pitch sizes: from the kampung pitch, a night market, a temple courtyard, a tea plantation, a fishermen\'s pier, a volcano crater, a city rooftop, a bamboo forest, an indoor futsal hall and an offshore platform to the grand stadium. Each surface changes how fast the ball rolls and how it bounces.' },
+      { h: 'Online play for up to 8 players' },
+      { p: 'Up to **8 people** can play in one room, each on their own phone, tablet or PC. The host is free to split the teams: everyone on one team against the CPU, 1 vs 1, 2 vs 2, 4 vs 4, 3 vs 5, and so on. Positions not held by a human, and the keeper, are CPU-controlled. Each person controls one player and can use SWITCH to move to a player no teammate is holding.' },
+      { ol: [
+        'Host: Play Online → Create Room. A QR, a room code and a share-link button appear.',
+        'Other players: Play Online → Join Room, then scan the QR, open the shared link, or type the code.',
+        'Each guest picks Team A or Team B (the host can move them by tapping their name), then presses I\'m ready.',
+        'The host presses Start. Anyone not ready yet can join the next match.'
+      ] },
+      { p: 'The first player on each team is the **captain**, who sets the formation, tactics and substitutions for that team. If a player\'s signal drops, the CPU takes over their player for the moment and they rejoin automatically once reconnected. Each team holds at most 4 humans on the 5 vs 5 pitch, 6 on 7 vs 7 and 10 on 11 vs 11.' },
+      { h: 'Local WiFi / hotspot without internet' },
+      { p: 'In **Play Online → 📶 Local WiFi**: all phones on the same WiFi (or one phone turns on its hotspot). The host presses **Create invite code** and sends the code (QR, Share to WhatsApp/Bluetooth, or copy). The guest pastes or scans that code, presses **Create reply code**, and sends it back. The host pastes the reply → **Connect**. Repeat for each further guest (up to 7 guests). After that the match runs directly between the phones with no server. A browser cannot use Bluetooth itself for play, only to send the code.' },
+      { h: 'Pro League mode' },
+      { p: 'In the match setup choose **Ruleset → Pro League**: official football rules — **offside**, **fouls = free kicks** (opponents retreat 9.15 m), **fouls in the box = penalty**, **yellow & red cards** (two yellows = sent off), throw-ins, corner kicks and goal kicks. The match has **two halves**: the teams swap ends at half-time. The keeper **may not handle a back-pass**. Village rules (3 corners = penalty, hot ball) are switched off automatically. **Tarkam** mode uses village rules with no offside.' },
+      { h: 'Squad types' },
+      { p: 'In **My Team** you can choose the squad type: **Villagers**, **Shapeshifters**, **Ghosts**, **Mammals**, **Mech Robots**, **Oil & Gas Crew** and **Party Folk**. Each type has its own sounds when shooting, tackling and scoring. You can change every player\'s name, number, face and abilities yourself, including the 5 substitutes.' },
+      { p: 'There are 13 CPU teams, including **Bintang Liburan** ("Holiday Stars"): a made-up team of world stars on holiday in the village.' },
+      { h: 'Shot power' },
+      { p: 'On a special shot, the result is decided by **how hard the striker shoots** against the power of the keeper\'s move. Fill the meter to the green **PERFECT!** zone (85–100%) for a power bonus. Past 100% the ball may sail over.' },
+      { p: 'The ideal distance is 8–12 metres. Too close and the keeper closes the angle; too far and the keeper has time to react. An opponent right on you when you shoot reduces the power.' },
+      { p: 'Shooting straight after receiving a pass gives a **Combo** bonus of +10%.' },
+      { h: 'Keeper silat moves' },
+      { p: 'Opposing keepers automatically use silat. Each keeper has **5 moves for 5 goal zones**; the other zones only get a weaker plain catch. Moves you have already seen are recorded in the aiming box, so you know which zones are weak.' },
+      { h: 'Spirit & the Ultimate Move' },
+      { p: 'The **SPIRIT** bar fills from passes, tackles, saves, and when you concede. When it is full, your next special shot becomes the **Ultimate Move**: bigger fire and +28% power.' },
+      { h: 'Village rules' },
+      { ul: [
+        '3 corner kicks = a penalty (Ball Out mode).',
+        'Hot ball: holding the ball for more than 6 seconds makes it pop loose.',
+        'Golden Goal: if scores are level, the next goal wins.',
+        'Fire Penalty Shootout: 5 kickers per team, then sudden death.'
+      ] },
+      { h: 'Weather & balls' },
+      { dyn: 'weather' }
+    ]
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
