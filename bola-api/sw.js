@@ -1,5 +1,5 @@
 // Bola Api Arena - service worker: game tetap bisa dibuka offline (mode lokal) setelah pertama kali dimuat.
-const CACHE = 'bola-api-v4';
+const CACHE = 'bola-api-v5';
 const CORE = ['./', 'index.html', 'style.css', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'maskable-192.png', 'maskable-512.png',
   'js/util.js', 'js/i18n.js', 'js/lang_en.js', 'js/guide.js', 'js/data.js', 'js/data2.js', 'js/sim.js', 'js/ai.js', 'js/sim2.js', 'js/render.js', 'js/chars.js', 'js/arena.js', 'js/arena2.js', 'js/arena3.js', 'js/fx.js', 'js/fx2.js', 'js/cine.js', 'js/audio.js', 'js/narrator.js', 'js/input.js', 'js/net.js', 'js/ui.js', 'js/layout.js', 'js/ui2.js', 'js/game.js', 'js/main.js',
   'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',

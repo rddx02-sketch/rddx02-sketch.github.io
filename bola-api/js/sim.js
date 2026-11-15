@@ -16,6 +16,7 @@
     return { mx: 0, mz: 0, sprint: false, passSeq: 0, gocekSeq: 0, switchSeq: 0, shootHeld: false, shootSeq: 0, charge: 0, zc: 0, zr: 1, skipSeq: 0, chase: false, passCharge: 0, lobSeq: 0, lobCharge: 0,
       longSeq: 0, longCharge: 0, chipSeq: 0, chipCharge: 0, easy: false };
   }
+  var AIR_DRAG = 0.997, AIR_K = -60 * Math.log(AIR_DRAG);
   function blankHs() { return { passSeq: 0, gocekSeq: 0, switchSeq: 0, shootSeq: 0, shootHeld: false, skipSeq: 0, lobSeq: 0, longSeq: 0, chipSeq: 0 }; }
 
   var Sim = BA.Sim = function (cfg) {
@@ -372,7 +373,7 @@
     if (b.y > 0.35) {
       var ws = D.bv(this.ballDef, 'wind') * 0.55;
       b.vx += this.wind.x * ws * dt; b.vz += this.wind.z * ws * dt;
-      var drag = Math.pow(0.985, dt * 60); b.vx *= drag; b.vz *= drag;
+      var drag = Math.pow(AIR_DRAG, dt * 60); b.vx *= drag; b.vz *= drag; /* hambatan udara bola melayang (dulu terlalu besar: umpan lambung jatuh pendek) */
     }
     b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
     if (b.y <= R) {
@@ -781,25 +782,43 @@
   S.doLob = function (p, dx, dz, pow) {
     if (this.ball.owner !== p) return;
     pow = U.clamp(U.num(pow, 0.6), 0.2, 1.2);
-    var r = this.pickReceiver(p, dx, dz, true);
     var spdMul = D.bv(this.ballDef, 'spd');
     var f = this.faceVec(p);
-    var maxD = 10 + pow * 26 * (0.75 + F.ss * 0.25);
+    /* arah: joystick bila ditekan, kalau tidak arah hadap badan */
+    var ax0 = U.num(dx, 0), az0 = U.num(dz, 0), al0 = Math.sqrt(ax0 * ax0 + az0 * az0);
+    if (al0 < 0.2) { ax0 = f[0]; az0 = f[1]; al0 = 1; }
+    ax0 /= al0; az0 /= al0;
+    /* jarak mengikuti lama tahan (seperti PS4): ketukan ±8 m, tahan penuh sampai ±40 m (lapangan besar ±60 m) */
+    var maxD = Math.min(F.L * 0.85, 30 + F.ss * 14);
+    var want = 8 + U.clamp((pow - 0.2) / 1.0, 0, 1) * (maxD - 8);
+    /* penerima: kawan di arah tendangan yang jaraknya paling cocok dengan jarak yang diminta */
+    var r = null, best = 1e9, self = this;
+    this.players.forEach(function (q) {
+      if (q === p || q.team !== p.team || q.hidden || q.role === 'GK' || q.red) return;
+      var qx = q.x - p.x, qz = q.z - p.z, qd = Math.sqrt(qx * qx + qz * qz);
+      if (qd < 4) return;
+      var dot = (qx * ax0 + qz * az0) / qd;
+      if (dot < 0.62) return;
+      var miss = Math.abs(qd - want);
+      if (miss > Math.max(8, want * 0.5)) return;
+      var sc = miss + (1 - dot) * 18;
+      if (sc < best) { best = sc; r = q; }
+    });
+    void self;
     var tx, tz;
     if (r) {
-      var d = U.dist(p.x, p.z, r.x, r.z);
-      /* tenaga menentukan jarak: tenaga pas (~0,7) mendarat di kaki rekan, lebih lama = lewat di depannya */
-      var dist = U.clamp(d * (0.55 + pow * 0.65), 5, Math.max(6, maxD));
-      var lead = 0.9;
-      var ax = (r.x + r.vx * lead) - p.x, az = (r.z + r.vz * lead) - p.z, al = Math.sqrt(ax * ax + az * az) || 1;
-      tx = p.x + ax / al * dist; tz = p.z + az / al * dist;
-    } else { tx = p.x + f[0] * maxD; tz = p.z + f[1] * maxD; }
+      /* jatuh di depan kawan: makin lama ditahan makin jauh di depannya (kawan berlari menjemput) */
+      var lead = 0.9, rx = r.x + r.vx * lead - p.x, rz = r.z + r.vz * lead - p.z, rd = Math.sqrt(rx * rx + rz * rz) || 1;
+      var extra = U.clamp((want - rd) * 0.5, -3, 6);
+      tx = p.x + rx / rd * (rd + extra); tz = p.z + rz / rd * (rd + extra);
+    } else { tx = p.x + ax0 * want; tz = p.z + az0 * want; }
     tx = U.clamp(tx, -F.L / 2 + 0.5, F.L / 2 - 0.5); tz = U.clamp(tz, -F.W / 2 + 0.5, F.W / 2 - 0.5);
     var ddx = tx - p.x, ddz = tz - p.z, dd = Math.sqrt(ddx * ddx + ddz * ddz) || 1;
     /* lintasan parabola: vy tinggi, kecepatan datar dari jarak & waktu terbang */
     var vy = U.clamp(5.5 + dd * 0.22, 6, 13);
     var tf = 2 * vy / 9.8;
-    var vh = dd / tf * 1.08 * spdMul; /* sedikit lebih karena hambatan udara */
+    /* kecepatan datar yang menempuh dd meter dalam tf detik dengan hambatan udara: dd = vh·(1−e^(−k·tf))/k */
+    var vh = dd * AIR_K / (1 - Math.exp(-AIR_K * tf)); void spdMul;
     this.setFacingTo(p, tx, tz);
     var off = r ? this.isOffside(p, r) : false;
     this.kickFree(p, ddx / dd * vh, vy, ddz / dd * vh, r, 'shoot');
