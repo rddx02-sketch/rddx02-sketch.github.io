@@ -61,6 +61,8 @@
     var au = this.ctx.audio;
     if (au) au.whoosh(ult ? 1.4 : 1);
     if (fx.chargeAura) fx.chargeAura(this.from, shot.fire[0], shot.fire[1], this.T.a);
+    if (fx.chargeRitual) fx.chargeRitual(this.from, shot.fire[0], shot.fire[1], this.T.a, ult);
+    this.prevHp = null;
   };
 
   Cine.prototype.skip = function () {
@@ -152,6 +154,7 @@
         fx.emberRain(from.x, 1.2, from.z, this.shot.fire[1], 30, 2.2);
         if (fx.cineLight) { fx.cineLight.position.set(from.x, 1.2, from.z); fx.cineLight.color.set(this.shot.fire[1]); fx.cineLight.intensity = 5; }
         if (fx.shotBurst) this.emblemFx = fx.shotBurst(c.type, from, dir, this.shot.fire[0], this.shot.fire[1], ult);
+        if (fx.launchFx) fx.launchFx(from, tgt, this.shot.fire[0], this.shot.fire[1], ult);
         if (ui.impact) ui.impact(ult ? 260 : 190);
         ui.flash(this.shot.fire[1], 160, 0.45);
         this.ctx.rig.kick(0.55);
@@ -170,6 +173,13 @@
       fx.updateBall(dt, hp, { hide: true });
       if (hp.y < 2.6 && Math.random() < 0.6) fx.groundFire(hp.x - dir * 0.8, hp.z + (Math.random() - 0.5) * 0.8, this.shot.fire[0], this.shot.fire[1]);
       if (Math.random() < 0.3) fx.emberRain(hp.x, hp.y + 0.5, hp.z, this.shot.fire[1], 3, 1.2);
+      if (fx.flightTrail) fx.flightTrail(hp, this.prevHp, this.shot.fire[0], this.shot.fire[1], t, this.ult ? 1.3 : 1);
+      this.prevHp = { x: hp.x, y: hp.y, z: hp.z };
+      /* kiper mulai merapal jurus sesaat sebelum api tiba */
+      if (!this.fired.ritual && t > T.b - 0.4 && fx.keeperRitual) {
+        this.fired.ritual = 1;
+        fx.keeperRitual(this.keepAt, -dir, this.skill ? this.skill.col : '#bfe9ff', T.c - T.b + 0.45, !!this.skill);
+      }
       this.ctx.rig.kick(0.012);
       var sideSign = this.camSide;
       // kamera menyamping, sedikit di depan wujud api, melihat ke belakang agar tubuhnya terlihat
@@ -198,6 +208,7 @@
       var hp2 = this.shape ? this.shape.headPos() : tgt;
       fx.updateBall(dt, hp2, { hide: true });
       if (Math.random() < 0.7) fx.burst(hp2.x + dir * 0.4, hp2.y, hp2.z, 'spark', { n: 3, c0: this.skill ? this.skill.col : '#bfe9ff' });
+      if (fx.clashTick) fx.clashTick(hp2, this.keepAt, dir, this.shot.fire[1], this.skill ? this.skill.col : '#bfe9ff', kk, dt);
       if (Math.random() < 0.4) fx.emberRain(hp2.x, hp2.y + 0.4, hp2.z, this.shot.fire[1], 4, 1.6);
       this.ctx.rig.kick(0.02 + kk * 0.03);
       ui.cineClash(U.clamp(kk * 1.3, 0, 1));
@@ -259,6 +270,7 @@
       fx.burst(tgt.x, 0.3, tgt.z, 'debris', { n: 20 });
       if (fx.cineLight) { fx.cineLightOwner = null; fx.cineLight.position.set(tgt.x, tgt.y + 0.5, tgt.z); fx.cineLight.color.set(this.shot.fire[1]); fx.cineLight.intensity = 7; }
       if (fx.goalBlast) fx.goalBlast(tgt.x, tgt.y, tgt.z, dir, this.shot.fire[0], this.shot.fire[1]);
+      if (fx.shieldShatter && this.skill) fx.shieldShatter({ x: this.keepAt.x + dir * 0.2, y: this.keepAt.y, z: this.keepAt.z }, -dir, this.skill ? this.skill.col : '#bfe9ff');
       if (ui.impact) ui.impact(240);
       ui.flash('#ffffff', 220, 0.75);
       if (this.ctx.arena) this.ctx.arena.bulge(dir, tgt.z, tgt.y);
@@ -271,7 +283,8 @@
       fx.emberRain(hp.x, hp.y + 0.3, hp.z, this.shot.fire[1], 24, 2);
       if (fx.impactFx) fx.impactFx(hp.x, hp.y, hp.z, c.res === 'catch' ? 2.6 : 3.6, this.skill ? this.skill.col : '#dff4ff', '#ffffff');
       if (fx.flip && c.res !== 'catch') fx.flip('bolt', hp.x, hp.y, hp.z, { size: 3.6, c0: this.shot.fire[0], c1: this.shot.fire[1], fps: 30 });
-      if (fx.keeperFx) fx.keeperFx(hp.x, hp.y, hp.z, -dir, c.res === 'catch' ? 'catch' : 'parry', 1.15, this.skill ? this.skill.col : null);
+      if (fx.keeperFx && c.res !== 'post') fx.keeperFx(hp.x, hp.y, hp.z, -dir, c.res === 'catch' ? 'catch' : 'parry', 1.15, this.skill ? this.skill.col : null);
+      if (fx.barrierRipple && c.res !== 'post') fx.barrierRipple(hp, -dir, this.skill ? this.skill.col : '#dff4ff', this.shot.fire[1]);
       if (c.res === 'catch') {
         fx.burst(hp.x, hp.y, hp.z, 'smoke', { n: 18 });
         if (this.skillFx && this.skillFx.hold) this.skillFx.hold(); else fx.burst(hp.x, hp.y, hp.z, 'steam', { n: 26 });

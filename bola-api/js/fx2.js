@@ -299,6 +299,217 @@
     }
   };
 
+  /* ======================================================================
+     EFEK EPIK BERLAPIS untuk adegan jurus: lingkaran rajah di tanah, pilar cahaya, pusaran debu,
+     gelombang kejut bertingkat, jejak api spiral, benturan bertenaga, perisai pecah / riak perisai.
+     ====================================================================== */
+  /* jalankan fn setelah `delay` detik waktu efek (ikut hit-stop & jeda) */
+  FX.prototype.later = function (delay, fn) {
+    var done = false, w = { life: delay + 0.05 };
+    w.update = function (dt, t) { if (!done && t >= delay) { done = true; fn(); } };
+    return this.spawn(w);
+  };
+  var runeTexC = null;
+  function runeTex() {
+    if (runeTexC) return runeTexC;
+    var cv = document.createElement('canvas'); cv.width = cv.height = 512;
+    var x = cv.getContext('2d'), c = 256, i;
+    x.fillStyle = '#000'; x.fillRect(0, 0, 512, 512);
+    x.strokeStyle = '#fff'; x.fillStyle = '#fff'; x.lineCap = 'round';
+    var ring = function (r, w, a) { x.globalAlpha = a; x.lineWidth = w; x.beginPath(); x.arc(c, c, r, 0, Math.PI * 2); x.stroke(); };
+    ring(246, 7, 1); ring(232, 2, 0.8); ring(176, 5, 0.95); ring(164, 2, 0.6); ring(78, 4, 0.9);
+    /* rajah: tanda-tanda pendek di antara dua lingkaran luar */
+    for (i = 0; i < 48; i++) {
+      var a = i / 48 * Math.PI * 2, r0 = 186, r1 = i % 4 === 0 ? 226 : (i % 2 ? 204 : 214);
+      x.globalAlpha = 0.9; x.lineWidth = i % 4 === 0 ? 6 : 3;
+      x.beginPath(); x.moveTo(c + Math.cos(a) * r0, c + Math.sin(a) * r0); x.lineTo(c + Math.cos(a) * r1, c + Math.sin(a) * r1); x.stroke();
+      if (i % 4 === 2) { x.beginPath(); x.arc(c + Math.cos(a) * 214, c + Math.sin(a) * 214, 5, 0, 6.3); x.fill(); }
+    }
+    /* bintang delapan & segitiga bersilang di dalam */
+    x.globalAlpha = 0.85; x.lineWidth = 4;
+    for (var k = 0; k < 2; k++) {
+      x.beginPath();
+      for (i = 0; i <= 4; i++) { var b = (i * 2 / 4 + k / 4) * Math.PI * 2 * 0.5 * 2 / 2, rr = 164; var ang = i / 4 * Math.PI * 2 + k * Math.PI / 4; if (i === 0) x.moveTo(c + Math.cos(ang) * rr, c + Math.sin(ang) * rr); else x.lineTo(c + Math.cos(ang) * rr, c + Math.sin(ang) * rr); void b; }
+      x.stroke();
+    }
+    for (k = 0; k < 2; k++) {
+      x.beginPath();
+      for (i = 0; i <= 3; i++) { var ang2 = i / 3 * Math.PI * 2 + k * Math.PI / 3 - Math.PI / 2; if (i === 0) x.moveTo(c + Math.cos(ang2) * 150, c + Math.sin(ang2) * 150); else x.lineTo(c + Math.cos(ang2) * 150, c + Math.sin(ang2) * 150); }
+      x.stroke();
+    }
+    var g = x.createRadialGradient(c, c, 0, c, c, 90); g.addColorStop(0, 'rgba(255,255,255,0.55)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.globalAlpha = 1; x.fillStyle = g; x.fillRect(0, 0, 512, 512);
+    runeTexC = new THREE.CanvasTexture(cv); runeTexC.__baShared = true;
+    return runeTexC;
+  }
+  /* lingkaran rajah di tanah: muncul membesar, berputar, berdenyut, lalu memudar */
+  FX.prototype.runeCircle = function (x, z, size, c0, c1, life, spin, y) {
+    var tex = runeTex();
+    var mk = function (sc, col, op) {
+      var m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: tex, color: new THREE.Color(col), transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+      m.rotation.x = -Math.PI / 2; m.scale.setScalar(sc); m.renderOrder = 6; return m;
+    };
+    var grp = new THREE.Group(); grp.position.set(x, y || 0.05, z);
+    var a = mk(size, c1, 0.9), b = mk(size * 0.72, c0, 0.8); b.position.y = 0.01;
+    grp.add(a); grp.add(b);
+    var e = { group: grp, life: life || 1.2 };
+    e.update = function (dt, t) {
+      var k = t / e.life, appear = U.easeOut(Math.min(1, t / 0.22)), fade = k > 0.75 ? 1 - (k - 0.75) / 0.25 : 1;
+      a.rotation.z += dt * (spin || 1.2); b.rotation.z -= dt * (spin || 1.2) * 1.7;
+      var pulse = 1 + Math.sin(t * 14) * 0.03;
+      a.scale.setScalar(size * appear * pulse); b.scale.setScalar(size * 0.72 * appear / pulse);
+      a.material.opacity = 0.9 * fade; b.material.opacity = 0.8 * fade;
+    };
+    e.update(0, 0);
+    return this.spawn(e);
+  };
+  /* pilar cahaya tegak (silinder terbuka berpendar) */
+  FX.prototype.lightPillar = function (x, z, r, h, col, life, y) {
+    var g = new THREE.CylinderGeometry(r, r * 1.15, h, 24, 1, true); g.translate(0, h / 2, 0);
+    var cv = document.createElement('canvas'); cv.width = 4; cv.height = 64;
+    var cx = cv.getContext('2d'), gr = cx.createLinearGradient(0, 64, 0, 0);
+    gr.addColorStop(0, '#fff'); gr.addColorStop(0.35, '#999'); gr.addColorStop(1, '#000');
+    cx.fillStyle = gr; cx.fillRect(0, 0, 4, 64);
+    var tx = new THREE.CanvasTexture(cv);
+    var m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: tx, color: new THREE.Color(col), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+    m.position.set(x, y || 0, z); m.renderOrder = 6;
+    var e = { group: m, life: life || 1 };
+    e.update = function (dt, t) {
+      var k = t / e.life, a = k < 0.15 ? k / 0.15 : (1 - (k - 0.15) / 0.85);
+      m.material.opacity = 0.26 * a * (0.85 + Math.sin(t * 30) * 0.15);
+      m.scale.set(1 + k * 0.3, 0.6 + U.easeOut(Math.min(1, k * 3)) * 0.4, 1 + k * 0.3);
+      m.rotation.y += dt * 2;
+    };
+    e.update(0, 0);
+    return this.spawn(e);
+  };
+  /* ancang-ancang jurus: rajah di tanah, pilar cahaya, debu & bara tersedot ke bola, tanah retak */
+  FX.prototype.chargeRitual = function (pos, c0, c1, dur, ult) {
+    var fx = this, big = ult ? 1.3 : 1, pm = this.pm || 1;
+    this.runeCircle(pos.x, pos.z, 4.2 * big, c0, c1, dur + 0.5, 1.6);
+    this.lightPillar(pos.x, pos.z, 0.7 * big, 7 * big, c1, dur + 0.25);
+    if (ult) this.lightPillar(pos.x, pos.z, 1.3, 11, c0, dur + 0.35);
+    var e = { life: dur };
+    e.update = function (dt, t) {
+      var k = t / e.life, n = Math.round((2 + k * 4) * pm), i;
+      for (i = 0; i < n; i++) {
+        /* debu & serpih berpusar masuk ke arah bola */
+        var a = Math.random() * U.TAU, r = 2.6 + Math.random() * 1.6;
+        var px = pos.x + Math.cos(a) * r, pz = pos.z + Math.sin(a) * r;
+        var tx = -Math.cos(a) * r * 2.2 - Math.sin(a) * 2.5, tz = -Math.sin(a) * r * 2.2 + Math.cos(a) * 2.5;
+        fx.normPS.emit(px, 0.08 + Math.random() * 0.3, pz, tx, 0.6 + Math.random(), tz, 0.45, 0.12, 0.02, fx.dustCol || '#cdb48a', '#8a6f4d', 0.55, -0.4, 0.97);
+      }
+      for (i = 0; i < Math.round(3 * pm); i++) {
+        /* bara naik menyusuri pilar */
+        var a2 = Math.random() * U.TAU, r2 = 0.3 + Math.random() * 0.8 * big;
+        fx.addPS.emit(pos.x + Math.cos(a2) * r2, 0.1, pos.z + Math.sin(a2) * r2, Math.cos(a2 + 1.5) * 1.2, 3 + Math.random() * 4 * big, Math.sin(a2 + 1.5) * 1.2, 0.7, 0.14, 0.03, c1, c0, 1, -1, 0.97);
+      }
+      if (Math.random() < dt * 8) fx.normPS.emit(pos.x + (Math.random() - 0.5) * 3, 0.1, pos.z + (Math.random() - 0.5) * 3, 0, 2 + Math.random() * 2, 0, 0.6, 0.12, 0.08, '#5b4b3c', '#3a3029', 1, 6, 0.99);
+    };
+    this.spawn(e);
+  };
+  /* saat api meledak dari kaki: gelombang kejut bertingkat, tanah retak, bongkahan terlempar, kilau sinar */
+  FX.prototype.launchFx = function (from, to, c0, c1, ult) {
+    var fx = this, dx = to.x - from.x, dz = to.z - from.z, l = Math.sqrt(dx * dx + dz * dz) || 1, big = ult ? 1.3 : 1, pm = this.pm || 1, i;
+    dx /= l; dz /= l;
+    for (i = 0; i < 3; i++) (function (k) {
+      fx.later(0.06 * k, function () { airRing(fx, from.x + dx * (0.6 + k * 1.1), 0.75, from.z + dz * (0.6 + k * 1.1), dx, dz, (2.2 + k * 0.9) * big, 0.38, k ? c1 : '#ffffff', 0.7 - k * 0.15); });
+    })(i);
+    this.flip('crack', from.x, 0.07, from.z, { size: 5.5 * big, c0: c0, c1: '#fff2c0', flat: true, fps: 16 });
+    this.flip('shock', from.x, 0.08, from.z, { size: 9 * big, c0: c1, c1: '#ffffff', flat: true, fps: 32, op: 0.8 });
+    this.flip('bolt', from.x, 1.0, from.z, { size: 3.2 * big, c0: c1, c1: '#ffffff', fps: 34 });
+    /* bongkahan tanah besar terlempar ke belakang & samping */
+    for (i = 0; i < Math.round(14 * pm * big); i++) {
+      var a = Math.random() * U.TAU, sp = 2 + Math.random() * 5;
+      this.normPS.emit(from.x, 0.1, from.z, Math.cos(a) * sp - dx * 2, 3 + Math.random() * 5, Math.sin(a) * sp - dz * 2, 0.9 + Math.random() * 0.5, 0.16 + Math.random() * 0.14, 0.12, '#4a3b2e', '#2c241d', 1, 11, 0.99);
+    }
+    /* semburan bara memanjang searah tendangan */
+    for (i = 0; i < Math.round(40 * pm * big); i++) {
+      var s2 = 6 + Math.random() * 14, sd = (Math.random() - 0.5) * 4, up = (Math.random() - 0.3) * 4;
+      this.addPS.emit(from.x, 0.5 + Math.random() * 0.6, from.z, dx * s2 - dz * sd, up, dz * s2 + dx * sd, 0.3 + Math.random() * 0.35, 0.22, 0.03, '#ffffff', c1, 1, 2, 0.93);
+    }
+    if (R3.quality > 0) this.flip('firewave', from.x + dx * 1.2, 0.9, from.z + dz * 1.2, { size: 6 * big, c0: c0, c1: c1, fps: 26, sy: 0.55, yaw: Math.atan2(dx, dz) });
+  };
+  /* jejak terbang wujud api: pita bara spiral, percik jatuh, kerak gosong di tanah. Dipanggil tiap frame tahap B */
+  FX.prototype.flightTrail = function (hp, prev, c0, c1, t, big) {
+    if (!prev) return;
+    var pm = this.pm || 1, dx = hp.x - prev.x, dy = hp.y - prev.y, dz = hp.z - prev.z, d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (d < 0.01 || d > 6) return;
+    var n = Math.min(14, Math.ceil(d / 0.12) * pm), i;
+    for (i = 0; i < n; i++) {
+      var f = i / n, ang = (t + f * 0.016) * 26 + i * 0.4, rr = 0.55 * (big || 1);
+      var px = prev.x + dx * f, py = prev.y + dy * f, pz = prev.z + dz * f;
+      /* dua untai spiral berlawanan */
+      this.addPS.emit(px, py + Math.sin(ang) * rr, pz + Math.cos(ang) * rr, 0, 0.3, 0, 0.32, 0.26, 0.04, c1, c0, 0.95, 0, 0.9);
+      this.addPS.emit(px, py - Math.sin(ang) * rr, pz - Math.cos(ang) * rr, 0, 0.3, 0, 0.32, 0.2, 0.04, '#ffffff', c1, 0.75, 0, 0.9);
+    }
+    if (Math.random() < 0.5) this.addPS.emit(hp.x, hp.y, hp.z, (Math.random() - 0.5) * 2, -1, (Math.random() - 0.5) * 2, 0.6, 0.12, 0.02, c1, c0, 1, 9, 0.99);
+    if (hp.y < 2.2 && Math.random() < 0.35) this.scorch(hp.x, hp.z, c1, 0.9, 5);
+  };
+  /* aura kiper saat merapal jurus: rajah di kakinya, pilar, bintik cahaya berputar mengelilingi tubuh */
+  FX.prototype.keeperRitual = function (at, face, col, dur, special) {
+    var fx = this, pm = this.pm || 1, c1 = '#ffffff', c0 = col || '#8fd3ff';
+    var gx = at.x - face * 0.1;
+    this.runeCircle(gx, at.z, special ? 4.6 : 3, c0, c1, dur + 0.4, -1.4);
+    if (special) this.lightPillar(gx, at.z, 0.9, 6.5, c0, dur + 0.3);
+    var e = { life: dur };
+    e.update = function (dt, t) {
+      var n = Math.round((special ? 4 : 2) * pm), i;
+      for (i = 0; i < n; i++) {
+        var a = t * 5 + i / n * U.TAU + Math.random() * 0.3, r = 0.9 + Math.sin(t * 7 + i) * 0.2, y = 0.2 + ((t * 1.6 + i * 0.37) % 1) * 2.3;
+        fx.addPS.emit(gx + Math.cos(a) * r, y, at.z + Math.sin(a) * r, -Math.sin(a) * 2, 0.8, Math.cos(a) * 2, 0.35, 0.16, 0.03, c1, c0, 1, 0, 0.92);
+      }
+      /* angin dari kiper meniup debu ke luar */
+      if (Math.random() < 0.6) { var a3 = Math.random() * U.TAU; fx.normPS.emit(gx + Math.cos(a3) * 0.5, 0.08, at.z + Math.sin(a3) * 0.5, Math.cos(a3) * 3, 0.3, Math.sin(a3) * 3, 0.5, 0.15, 0.6, fx.dustCol || '#cdb48a', '#9c805a', 0.35, -0.2, 0.94); }
+    };
+    this.spawn(e);
+  };
+  /* tiap frame saat adu tenaga: kilat bercabang, gelombang kejut berirama, serpih terangkat dari tanah */
+  FX.prototype.clashTick = function (hp, kp, dir, c0, kc, k, dt) {
+    var pm = this.pm || 1, i;
+    this.clashAcc = (this.clashAcc || 0) + dt;
+    if (this.clashAcc > 0.13) {
+      this.clashAcc = 0;
+      var mx = (hp.x + kp.x) / 2, my = (hp.y + kp.y) / 2, mz = (hp.z + kp.z) / 2;
+      airRing(this, mx, my, mz, dir, 0, 1.6 + k * 2.2, 0.3, Math.random() < 0.5 ? c0 : kc, 0.55);
+    }
+    for (i = 0; i < Math.round(5 * pm); i++) {
+      /* percik menyebar di bidang benturan */
+      var a = Math.random() * U.TAU, sp = 4 + Math.random() * 7;
+      this.addPS.emit(hp.x + dir * 0.3, hp.y, hp.z, (Math.random() - 0.5) * 2, Math.sin(a) * sp, Math.cos(a) * sp, 0.25, 0.14, 0.02, '#ffffff', Math.random() < 0.5 ? c0 : kc, 1, 4, 0.9);
+    }
+    if (Math.random() < 0.5 * pm) {
+      /* kerikil & debu terangkat oleh tekanan tenaga */
+      var gx = hp.x + (Math.random() - 0.5) * 3, gz = hp.z + (Math.random() - 0.5) * 3;
+      this.normPS.emit(gx, 0.05, gz, 0, 1.5 + Math.random() * 2.5 * (0.5 + k), 0, 0.8, 0.07 + Math.random() * 0.06, 0.05, '#5b4b3c', '#3a3029', 1, -0.6, 0.99);
+    }
+  };
+  /* jurus kiper ditembus: perisai pecah menjadi kepingan */
+  FX.prototype.shieldShatter = function (at, face, col) {
+    var pm = this.pm || 1, i, c0 = col || '#8fd3ff';
+    this.flip('crack', at.x, at.y, at.z, { size: 4.6, c0: c0, c1: '#ffffff', fps: 24, yaw: face > 0 ? Math.PI / 2 : -Math.PI / 2 });
+    for (i = 0; i < Math.round(36 * pm); i++) {
+      var a = Math.random() * U.TAU, sp = 2 + Math.random() * 6;
+      this.addPS.emit(at.x, at.y + (Math.random() - 0.5) * 1.2, at.z + (Math.random() - 0.5) * 1.6, face * (1 + Math.random() * 3) * -1 + Math.cos(a) * 1.5, Math.sin(a) * sp, Math.cos(a) * sp, 0.6 + Math.random() * 0.5, 0.22, 0.05, '#ffffff', c0, 1, 9.8, 0.97);
+    }
+    airRing(this, at.x, at.y, at.z, face, 0, 4.2, 0.45, c0, 0.7);
+  };
+  /* jurus kiper bertahan: riak perisai bertingkat + api padam jadi uap */
+  FX.prototype.barrierRipple = function (at, face, col, fireCol) {
+    var fx = this, pm = this.pm || 1, c0 = col || '#8fd3ff', i;
+    for (i = 0; i < 4; i++) (function (k) {
+      fx.later(0.09 * k, function () { airRing(fx, at.x - face * 0.05 * k, at.y, at.z, face, 0, 1.4 + k * 1.3, 0.45, k % 2 ? '#ffffff' : c0, 0.75 - k * 0.12); });
+    })(i);
+    for (i = 0; i < Math.round(26 * pm); i++) {
+      var a = Math.random() * U.TAU;
+      this.normPS.emit(at.x, at.y, at.z, face * (0.5 + Math.random() * 1.5), 1 + Math.random() * 2, Math.cos(a) * 1.8, 0.9 + Math.random() * 0.6, 0.25, 1.1, '#e8eef2', '#9aa4ab', 0.45, -0.6, 0.95);
+    }
+    for (i = 0; i < Math.round(18 * pm); i++) {
+      var a2 = Math.random() * U.TAU, s2 = 3 + Math.random() * 5;
+      this.addPS.emit(at.x, at.y, at.z, -face * (1 + Math.random() * 2), Math.sin(a2) * s2, Math.cos(a2) * s2, 0.4, 0.16, 0.02, fireCol || '#ffb347', '#ff4d1a', 1, 6, 0.93);
+    }
+  };
+
   /* ---------- penanda pemain yang dipegang manusia (sampai 8 kursi) ---------- */
   function glow(col, op) { return new THREE.MeshBasicMaterial({ color: new THREE.Color(col), transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }); }
   FX.prototype.seatMarker = function (k, p, on, col, arrow) {
