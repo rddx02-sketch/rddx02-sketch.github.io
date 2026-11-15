@@ -957,6 +957,21 @@
       if (o.state === 'lobby' || o.state === 'joining') App.guestRefresh();
     }
   });
+  /* tombol Kembali di aplikasi Android: saat laga = jeda/lanjut, di layar lain = kembali satu layar.
+     Mengembalikan true bila sudah ditangani; false = sudah di menu utama (aplikasi boleh keluar) */
+  App.androidBack = function () {
+    try {
+      var modal = document.getElementById('modal');
+      if (modal && !modal.hidden) { UI.navBack(); return true; }
+      if (BA.Layout && BA.Layout.editing) { BA.Layout.cancel(); return true; }
+      if (App.match && (UI.cur === 'play' || UI.cur === 'scrPause' || UI.cur === 'scrStrategy')) {
+        if (UI.cur === 'play') App.pause(); else if (UI.cur === 'scrStrategy') UI.show('scrPause', false); else App.resume();
+        return true;
+      }
+      if (UI.cur && UI.cur !== 'scrMenu') { UI.navBack(); return true; }
+    } catch (e) { /* abaikan */ }
+    return false;
+  };
   App.hostAlone = function () {
     var m0 = App.match;
     if (!m0 || m0.kind !== 'host') return;
@@ -1104,6 +1119,8 @@
     root.addEventListener('orientationchange', function () { setTimeout(R3.resize, 250); setTimeout(R3.resize, 800); });
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) BA.Narr.stop();
+      /* suara penonton & efek ikut diam saat game ditinggal; nyala lagi saat kembali */
+      try { if (document.hidden && Audio.ctx && Audio.ctx.state === 'running') Audio.ctx.suspend(); else if (!document.hidden && Audio.ctx && Audio.ctx.state === 'suspended') Audio.ctx.resume(); } catch (e) { /* abaikan */ }
       if (document.hidden && App.match && App.match.kind === 'local' && !App.paused && UI.cur === 'play') App.pause();
       if (!document.hidden) { last = 0; }
     });

@@ -1,7 +1,7 @@
 {
   "name": "Bola Api Arena",
   "short_name": "Bola Api",
-  "description": "Sepak bola api ala kampung: siluman, hantu, robot, tim kantor sampai partai beradu di arena berapi. Main sendiri, berdua di satu HP, atau online dengan kode ruangan.",
+  "description": "Sepak bola api ala kampung: siluman, hantu, robot, tim kantor sampai partai beradu di arena berapi. Main sendiri, turnamen, atau online sampai 8 pemain dengan kode ruangan.",
   "id": "./",
   "start_url": "./",
   "scope": "./",

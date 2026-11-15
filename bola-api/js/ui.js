@@ -57,7 +57,7 @@
     var ua = navigator.userAgent || '';
     var iPadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1; // iPad yang menyamar sebagai Mac
     return { ios: /iPhone|iPod/.test(ua), ipad: /iPad/.test(ua) || iPadOS, android: /Android/.test(ua), mobile: /Mobi|Android/i.test(ua) || iPadOS,
-      standalone: !!(navigator.standalone || (root.matchMedia && root.matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches)),
+      standalone: !!(root.BAAndroid || navigator.standalone || (root.matchMedia && root.matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches)),
       framed: (function () { try { return root.self !== root.top; } catch (e) { return true; } })() };
   };
   FS.api = function () {

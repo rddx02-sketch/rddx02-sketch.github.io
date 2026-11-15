@@ -21,7 +21,7 @@
      TRANSPORT SUPABASE REALTIME (di luar claude.ai: Vercel/GitHub Pages/file mandiri)
      Presence untuk tahu siapa di room, Broadcast untuk kiriman keadaan (lobi & laga).
      ====================================================================== */
-  Net.SB = { url: '', key: '', lib: 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js' };
+  Net.SB = { url: '', key: '', local: 'lib/supabase.js', lib: 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js' };
   Net.transport = '';
   Net.sbClient = null;
   function loadScript(src) {
@@ -41,7 +41,9 @@
       return Net.sbClient;
     };
     if (root.supabase && typeof root.supabase.createClient === 'function') { try { return Promise.resolve(mk()); } catch (e) { return Promise.reject(e); } }
-    return loadScript(Net.SB.lib).then(mk);
+    /* aplikasi Android membawa salinan pustaka sendiri (lib/supabase.js); kalau tidak ada, pakai CDN */
+    var first = (BA.isAndroidApp && Net.SB.local) ? loadScript(Net.SB.local).then(mk).catch(function () { return loadScript(Net.SB.lib).then(mk); }) : loadScript(Net.SB.lib).then(mk);
+    return first;
   };
   /* ======================================================================
      DAFTAR PESERTA ROOM (sama untuk semua jalur: room claude.ai, Supabase, WiFi lokal)
