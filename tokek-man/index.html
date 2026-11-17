@@ -703,6 +703,8 @@ const EN = {
   "Ketahuan": "Spotted",
   "Kota tanpa batas: berantas kejahatan, pantau dari atap dan menara": "An endless city: fight crime, keep watch from rooftops and towers",
   "BUNGA BERBUNGA": "COMPOUND INTEREST",
+  "Utangnya saya catat ya, Mas. Sudah berkali-kali.": "I'm writing your debt down, son. That makes too many times to count.",
+  "Mas Gilang... utang toiletnya numpuk. Jangan kabur ya.": "Mister Gilang... your toilet tab is piling up. Don't run off.",
 };
 // pieces of composed sentences ("Kalahkan " + name), longest first
 const ENP = [
@@ -3068,7 +3070,7 @@ const roadC = i => -175 + i * 50;
 })();
 // ===================== AUDIO (all synthesised with WebAudio) =====================
 const Snd = (function () {
-  let ctx = null, master = null, sfxBus = null, musBus = null, ambBus = null, voxBus = null, rev = null, revSend = null, noiseBuf = null;
+  let duckG = null, duckEnd = 0, duckLvl = 1; let ctx = null, master = null, sfxBus = null, musBus = null, ambBus = null, voxBus = null, rev = null, revSend = null, noiseBuf = null;
   let rainG = null, humG = null, eng = null;
   const vol = { sfx: 0.9, mus: 0.6 };
   let ok = false, last = {};
@@ -3082,7 +3084,7 @@ const Snd = (function () {
       master = ctx.createDynamicsCompressor(); master.threshold.value = -14; master.knee.value = 18; master.ratio.value = 5; master.attack.value = 0.004; master.release.value = 0.2;
       const out = ctx.createGain(); out.gain.value = 0.85; master.connect(out); out.connect(ctx.destination);
       sfxBus = ctx.createGain(); sfxBus.gain.value = vol.sfx; sfxBus.connect(master);
-      musBus = ctx.createGain(); musBus.gain.value = vol.mus; musBus.connect(master);
+      musBus = ctx.createGain(); musBus.gain.value = vol.mus; duckG = ctx.createGain(); musBus.connect(duckG); duckG.connect(master);
       ambBus = ctx.createGain(); ambBus.gain.value = vol.sfx * 0.8; ambBus.connect(master);
       voxBus = ctx.createGain(); voxBus.gain.value = vol.sfx * 1.25; voxBus.connect(master);
       // noise buffer
@@ -3271,27 +3273,178 @@ const Snd = (function () {
     rainG.gain.setTargetAtTime(sat(rain) * 0.2, t, 0.5); humG.gain.setTargetAtTime(0.05 * (powerDim ? 0.3 : 1), t, 0.5);
     try { schedule(); } catch (e) { errs++; M.next = ctx.currentTime + 1; }
   }
+  // music steps back while someone speaks (a: how much, 0..1; dur: seconds)
+  function duck(a, dur) {
+    if (!ok || !duckG) return; const t = ctx.currentTime, g = duckG.gain, active = t < duckEnd, lvl = Math.min(1 - a, active ? duckLvl : 1), end = Math.max(t + dur, active ? duckEnd : 0);
+    try { g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(lvl, t + 0.12); g.setValueAtTime(lvl, end); g.linearRampToValueAtTime(1, end + 0.6); } catch (e) { }
+    duckEnd = end; duckLvl = lvl;
+  }
   function setVol(s, m) { vol.sfx = s; vol.mus = m; if (ok) { sfxBus.gain.value = s; ambBus.gain.value = s * 0.8; musBus.gain.value = m; voxBus.gain.value = s * 1.25; } }
-  return { init, resume, suspend, play, music, update, setVol, engineOn, engineSet, engineOff, vol, get ctx() { return ctx; }, get voxBus() { return voxBus; }, names: Object.keys(FX), get errs() { return errs; }, get ok() { return ok; }, get mode() { return M.mode; } };
+  return { init, resume, suspend, play, music, update, setVol, duck, engineOn, engineSet, engineOff, vol, get ctx() { return ctx; }, get voxBus() { return voxBus; }, names: Object.keys(FX), get errs() { return errs; }, get ok() { return ok; }, get mode() { return M.mode; } };
 })();
 // ===================== VOICES =====================
 // Character lines are slices of one audio sprite (voices cast and generated with Higgsfield, ElevenLabs v4).
 // The sprite is either built into the page (VOICE_B64, filled in by the build when the pack file is there) or, when it
 // is not, fetched from VOICE_URL on hosts that allow it. With neither, the game simply stays unvoiced.
 const VOICE_B64 = '';
-const VOICE_URL = 'https://d2ol7oe51mr4n9.cloudfront.net/user_3M0VTwymKGkZet5trsoAQklSdRb/7467a4ed-6eeb-429d-82e2-a679fa056839.mp3';
-const VOICE_IDX = {"tm_tokek2":[0.1,0.81],"tm_tokek3":[1.07,0.8],"tm_atk1":[2.03,1.13],"tm_atk2":[3.32,0.61],"tm_atk3":[4.09,0.79],"tm_fin":[5.04,1.45],"tm_wave":[6.65,1.5],"tm_robot":[8.31,2.22],"tm_hurt1":[10.69,1.46],"tm_hurt2":[12.31,0.66],"tm_dead":[13.13,1.79],"tm_hero":[15.08,2.57],"tm_motto":[17.81,2.34],"tm_perch":[20.31,4.3],"tm_toilet":[24.77,3.86],"tm_stealth":[28.79,2.11],"tm_taunt":[31.06,1.05],"tm_win":[32.27,2.67],"gl_pay":[35.1,2.06],"gl_debt":[37.32,2.18],"gl_eat":[39.66,2.9],"ns_lang":[42.72,0.71],"ns_call":[43.59,2.52],"ns_2000":[46.27,5.06],"ns_good":[51.49,3.8],"ns_care":[55.45,1.36],"ns_crime":[56.97,3.51],"ns_over":[60.64,4.6],"ps_2000":[65.4,4.85],"ps_door":[70.41,2.93],"ps_debt":[73.5,2.61],"ps_member":[76.27,3.47],"ps_floor":[79.9,3.92],"th1_spot":[83.98,1.58],"th2_spot":[85.72,1.13],"th1_taunt":[87.01,1.64],"th1_hurt":[88.81,0.87],"th2_mercy":[89.84,2.33],"th1_flee":[92.33,1.03],"th2_ko":[93.52,2.96],"b_juragan":[96.64,4.99],"b_ratu":[101.79,3.84],"b_knalpot":[105.79,3.22],"b_baron":[109.17,4.9],"b_padam":[114.23,6.1]};
+const VOICE_URL = 'https://d2ol7oe51mr4n9.cloudfront.net/user_3M0VTwymKGkZet5trsoAQklSdRb/7399a4a6-0df7-4b0e-a913-319709e8d7a1.mp3';
+const VOICE_IDX = {"ns_retry1":[0.096,3.968],"ns_retry2":[4.176,4.658],"ns_retry3":[8.946,4.558],"ns_food1":[13.616,3.358],"ns_food2":[17.086,3.098],"ns_food3":[20.296,3.788],"ns_care1":[24.196,4.272],"ns_care2":[28.58,3.638],"ns_care3":[32.33,3.266],"ns_care4":[35.708,6.038],"ns_m1a":[41.858,4.398],"ns_2000":[46.368,5.488],"ns_m1end":[51.968,7.108],"ns_van":[59.188,5.538],"ns_m2a":[64.838,8.448],"ns_m2b":[73.398,9.048],"ns_m2c":[82.558,4.628],"ns_m2d":[87.298,6.088],"ns_m2e":[93.498,6.138],"ns_m2end":[99.748,6.088],"ns_m3a":[105.948,7.828],"ns_m3b":[113.888,4.238],"ns_m3c":[118.238,4.378],"ns_m3d":[122.728,8.178],"ns_m3end":[131.018,5.568],"ns_m4a":[136.698,5.678],"ns_m4b":[142.488,6.118],"ns_m4c":[148.718,4.568],"ns_m4end":[153.398,6.448],"ns_grid1":[159.958,4.318],"ns_grid2":[164.388,2.648],"ns_grid3":[167.148,5.278],"ns_m5a":[172.538,8.188],"ns_m5b":[180.838,6.888],"ns_m5c":[187.838,4.118],"ns_end":[192.068,7.598],"ns_r1":[199.778,3.258],"ns_r2":[203.148,4.408],"ns_r3":[207.668,3.848],"ns_r4":[211.628,5.088],"ns_r5":[216.828,6.518],"ns_r6":[223.458,6.138],"ns_c1":[229.708,3.888],"ns_c2":[233.708,4.378],"ns_c3":[238.198,3.819],"ns_c4":[242.128,3.678],"ns_c5":[245.918,4.018],"ns_b1":[250.048,3.738],"ns_b2a":[253.898,4.558],"ns_b2b":[258.568,4.128],"ns_b3":[262.808,6.258],"ns_b4":[269.178,5.968],"ns_b5":[275.258,3.452],"q_ns1":[278.823,5.288],"q_ns2":[284.223,5.318],"q_ns3":[289.653,3.678],"ps_back":[293.443,4.668],"ps_2000":[298.223,5.248],"ps_door":[303.583,3.958],"ps_debt":[307.653,2.928],"ps_member":[310.693,3.418],"ps_rent":[314.223,2.618],"ps_floor":[316.953,3.738],"ps_queue":[320.803,2.658],"ps_debt1":[323.573,3.058],"ps_debt2":[326.743,3.068],"ps_debt3":[329.923,3.298],"ps_debt4":[333.333,3.198],"ps_debt5":[336.643,3.078],"ps_debt6":[339.833,3.248],"ps_debt7":[343.193,3.342],"ps_debt8":[346.647,3.328],"ps_debt9":[350.087,3.348],"ps_debtX":[353.547,4.498],"ps_owe1":[358.157,3.478],"ps_owe2":[361.747,3.888],"ps_owe3":[365.747,3.518],"ps_owe4":[369.377,3.598],"ps_owe5":[373.087,3.598],"ps_owe6":[376.797,3.938],"ps_owe7":[380.847,4.138],"ps_owe8":[385.097,4.038],"ps_owe9":[389.247,4.038],"ps_oweX":[393.397,5.968],"ps_paid":[399.477,4.118],"q_ps":[403.707,3.548],"gl_pay":[407.367,3.198],"gl_debt":[410.677,2.878],"gl_m1":[413.667,7.718],"gl_eat":[421.497,3.638],"gl_m2":[425.247,1.938],"gl_m5":[427.297,1.808],"gl_end":[429.217,5.068],"tm_hero":[434.397,2.548],"tm_toilet":[437.057,3.848],"tm_m1":[441.017,2.488],"tm_m2a":[443.617,1.968],"tm_m2b":[445.697,0.828],"tm_m3a":[446.637,3.018],"tm_stealth":[449.767,2.198],"tm_perch":[452.077,4.308],"tm_m4a":[456.497,1.868],"tm_m4b":[458.477,1.888],"tm_m5a":[460.477,0.668],"tm_m5b":[461.257,2.588],"tm_m5end":[463.957,4.868],"tm_motto":[468.937,2.448],"tm_tokek1":[471.497,1.438],"tm_tokek2":[473.047,1.448],"tm_tokek3":[474.607,1.848],"tm_atk1":[476.567,1.308],"tm_atk2":[477.987,0.998],"tm_atk3":[479.097,1.388],"tm_atk4":[480.597,1.198],"tm_fin":[481.907,1.758],"tm_wave":[483.777,1.908],"tm_robot":[485.797,2.358],"tm_hurt1":[488.267,1.158],"tm_hurt2":[489.537,1.208],"tm_dead":[490.857,1.618],"tm_taunt":[492.587,1.288],"tm_win":[493.987,2.678],"tm_go1":[496.777,2.698],"tm_go2":[499.587,1.678],"tm_go3":[501.377,1.548],"tm_bike":[503.037,1.838],"tm_car":[504.987,1.888],"tm_bunglon":[506.987,1.258],"tm_low":[508.357,2.758],"tm_boss":[511.227,2.058],"tm_ko1":[513.397,1.528],"tm_ko2":[515.037,1.568],"tm_fly":[516.717,1.258],"nr_1":[518.087,5.868],"nr_2":[524.067,9.698],"nr_3":[533.877,9.718],"bj_intro":[543.707,7.478],"bj_hajar":[551.297,4.098],"bj_ko":[555.507,5.398],"bj_s1":[561.017,2.668],"bj_s2":[563.797,1.778],"bj_s3":[565.687,2.108],"bj_s4":[567.907,2.738],"br_intro":[570.757,7.158],"br_drone":[578.027,7.148],"br_ko":[585.287,3.558],"br_s1":[588.957,1.838],"br_s2":[590.907,1.828],"br_s3":[592.847,2.108],"br_s4":[595.067,3.018],"br_s5":[598.197,2.478],"br_s6":[600.787,1.988],"bk_intro":[602.887,10.158],"bk_ko":[613.157,4.178],"bk_s1":[617.447,2.138],"bk_s2":[619.697,2.868],"bk_s3":[622.677,1.848],"bk_s4":[624.637,1.988],"bk_s5":[626.737,1.408],"bk_s6":[628.257,2.868],"bk_s7":[631.237,1.558],"bb_intro":[632.907,5.578],"bb_hajar":[638.597,1.248],"bb_ko":[639.957,4.048],"bb_s1":[644.117,1.288],"bb_s2":[645.517,1.868],"bb_s3":[647.497,2.558],"bb_s4":[650.167,1.348],"bb_s5":[651.627,2.828],"bb_s6":[654.567,1.728],"bp_speaker":[656.407,8.628],"bp_intro":[665.147,6.668],"bp_why":[671.927,7.768],"bp_ko":[679.807,3.848],"bp_s1":[683.767,1.578],"bp_s2":[685.457,1.408],"bp_s3":[686.977,1.718],"bp_s4":[688.807,1.838],"bp_s5":[690.757,1.678],"bp_s6":[692.547,1.438],"th1_spot":[694.097,1.608],"th2_spot":[695.817,1.208],"th1_taunt":[697.137,1.718],"th1_hurt":[698.967,1.068],"th2_mercy":[700.147,2.428],"th1_flee":[702.687,1.068],"th2_ko":[703.867,3.198]};
 // spoken text (Indonesian source) -> clip
 const VOICE_LINE = {
-  'Dua ribu, Mas. Mau pahlawan, mau bukan, tetap bayar.': 'ps_2000', 'Mas... pintunya jangan dibanting.': 'ps_door', 'Langganan ya, Mas? Besok saya kasih kartu member.': 'ps_member',
-  'Hati-hati, Mas. Lantainya licin habis dipel.': 'ps_floor', 'Ngutang lagi? Pahlawan kok bokek.': 'ps_debt',
-  'Ini, Pak. Doakan saya selamat.': 'gl_pay', 'Ngutang dulu ya, Pak. Demi kota.': 'gl_debt', 'Lagi, Nek? Baru juga mau makan.': 'gl_eat',
-  'Malam ini... kota tidak sendirian.': 'tm_hero', 'Dari sini kota kelihatan kecil. Masalahnya saja yang besar.': 'tm_perch', 'Satu-satunya yang kubayar malam ini cuma toilet umum.': 'tm_toilet',
-  'Kota tidur. Tokek tidak.': 'tm_motto', 'Ssst. Orang mau tidur.': 'tm_stealth',
-  'Parkir di kotaku? Bayar. Lewat? Bayar. Napas? Bayar juga.': 'b_juragan', 'Tokek Man. Skor kreditmu jelek sekali. Utang toilet saja belum lunas.': 'b_ratu',
-  'Sunyi itu penyakit! Dan aku... DOKTERNYA! Resepku: seratus dua puluh desibel, tiga kali sehari!': 'b_knalpot', 'Kota ini kebanyakan taman! Kebanyakan pohon! Aku akan cor SEMUANYA jadi beton!': 'b_baron',
-  'Selamat malam, Kota Gulita. Ini Tuan Padam. Lampu kalian... saya PADAMKAN. Selamanya.': 'b_padam',
-  'Makan nanti. Cari toilet umum, ganti kostum. Jangan lupa bawa dua ribu!': 'ns_2000', '"Tokek jatuh dari plafon itu biasa. Yang penting naik lagi." — Nek Sum': 'ns_over'
+  "Bangun, Lang! Dia mulai kelelahan. Perhatikan pola serangannya.": "ns_retry1",
+  "Jangan menyerah. Pakai Kelebat untuk menghindar, lalu balas saat dia lengah.": "ns_retry2",
+  "Tokek jatuh itu biasa. Coba lagi, dia sudah ngos-ngosan.": "ns_retry3",
+  "Makan dulu, Lang. Pahlawan juga butuh nasi.": "ns_food1",
+  "Ini teh hangat. Jangan sok kuat.": "ns_food2",
+  "Nasi bungkus spesial, karetnya dua. Habiskan.": "ns_food3",
+  "Jaga dirimu, Lang. Kota ini cuma punya satu tokek.": "ns_care1",
+  "Kalau capek, pulang. Kalau belum, hajar.": "ns_care2",
+  "Jubahmu itu warna terong kesukaan Nenek.": "ns_care3",
+  "Dulu Nenek juara jujitsu sekecamatan. Sepuluh pukulan itu warisan.": "ns_care4",
+  "Lang! Radio polisi ribut. Pasar Malam diserbu preman parkir liar!": "ns_m1a",
+  "Makan nanti. Cari toilet umum, ganti kostum. Jangan lupa bawa dua ribu!": "ns_2000",
+  "Bagus, Lang. Tapi Juragan cuma jari kelingking Sindikat Lima Bayang. Empat bayangan lagi menunggu.": "ns_m1end",
+  "Itu mobil boksnya, di ujung jalan! Buntuti sampai markas. Jangan sampai ketahuan.": "ns_van",
+  "Warga satu kampung dijerat pinjaman kilat. Pinjam seratus, ditagih seribu. Dalangnya: Ratu Pinjol.": "ns_m2a",
+  "Berbunga, beranak, bercucu. Malam ini penagihnya keliling pakai mobil boks. Buntuti sampai markas, jangan sampai ketahuan.": "ns_m2b",
+  "Pakai Kadal Besi. Mode Bunglon-nya bikin mobilmu tembus pandang.": "ns_m2c",
+  "Markasnya ketemu! Tiga server di plaza itu yang menyebar spam tagihan. Hancurkan semuanya.": "ns_m2d",
+  "Penjaganya punya lampu sorot. Pakai Bunglon dan serang dari belakang untuk Sergapan Senyap.": "ns_m2e",
+  "Server padam, data utang terhapus. Warga bebas, Lang! Dua bayangan tumbang.": "ns_m2end",
+  "Lang! Hentikan knalpot-knalpot brong itu. Enam motor, dua putaran di tengah kota. Kejar pakai Cicak Kilat!": "ns_m3a",
+  "Tabrak saja, atau lempar suriken sambil ngebut.": "ns_m3b",
+  "Tiga motor mengitari Bundaran, tiga lagi di lingkar luar. Kejar, Lang!": "ns_m3c",
+  "Lawan bising dengan bising, Lang! Teriakan TO-KEK bikin telinganya berdenging. Dan pancing dia menabrak Tugu!": "ns_m3d",
+  "Akhirnya sunyi. Nenek bisa tidur. Tiga bayangan tumbang, Lang.": "ns_m3end",
+  "Baron Beton memasang pengacak sinyal di atap-atap. Radio Nenek kresek-kresek terus.": "ns_m4a",
+  "Naik ke atap, Lang. Tahan tombol TERBANG. Pantau kota dari atas, cari tiga pengacak itu.": "ns_m4b",
+  "Tiga pengacak sinyal, semuanya di atap! Terbang ke sana dan hancurkan, Lang.": "ns_m4c",
+  "Empat tumbang! Tinggal satu, Lang. Dalangnya. Dan dia tahu kamu datang...": "ns_m4end",
+  "Satu gardu menyala! Lihat, lampunya kembali satu per satu.": "ns_grid1",
+  "Dua! Setengah kota terang lagi, Lang.": "ns_grid2",
+  "Tiga gardu hidup! Tinggal Menara Gulita di selatan. Di sanalah dia.": "ns_grid3",
+  "Dia mematikan tiga gardu, Lang. Nyalakan lagi satu per satu: A di barat laut, B di timur, C di barat daya.": "ns_m5a",
+  "Dalam gelap, anak buahnya tak terlihat. Tapi tokek tidak butuh mata. Teriak TO-KEK!": "ns_m5b",
+  "Pak Slamet punya lilin. Tetap dua ribu.": "ns_m5c",
+  "Menyala, Lang! Semuanya menyala! Lima bayangan tumbang. Pulang, Nenek masakkan nasi goreng.": "ns_end",
+  "Awas, Lang! Tiga preman pasar mengendap di belakangmu.": "ns_r1",
+  "Pasar Malam ada di barat laut. Ikuti penanda di peta, Lang.": "ns_r2",
+  "Itu mereka! Juru parkir liar. Hati-hati yang melempar kerucut.": "ns_r3",
+  "Ketuanya menunggu di Bundaran. Dengar raungannya? Itu Doktor Knalpot.": "ns_r4",
+  "Sinyal bersih! Baron ada di lokasi proyek, tenggara. Dia bawa mainan besar, Lang.": "ns_r5",
+  "Menara Gulita, di ujung selatan. Hati-hati, Lang. Yang ini bukan preman biasa.": "ns_r6",
+  "Lang, ada pungli parkir liar dekat situ. Bereskan.": "ns_c1",
+  "Geng Brong lagi teriak-teriak di jalan. Suruh mereka pulang, Lang.": "ns_c2",
+  "Penagih pinjol gedor-gedor rumah warga. Tolong, Lang.": "ns_c3",
+  "Ada kuli bayaran merusak toko. Hentikan sebelum habis semua.": "ns_c4",
+  "Anak buah Tuan Padam mencopoti lampu jalan lagi. Kejar, Lang!": "ns_c5",
+  "Dia panggil anak buah! Teriak TO-KEK kalau terkepung, Lang.": "ns_b1",
+  "Drone itu perisainya, Lang! Lempar suriken ke drone dulu, baru hajar dia.": "ns_b2a",
+  "Drone itu perisainya, Lang! Lempar suriken dulu, baru hajar dia.": "ns_b2b",
+  "Motornya hancur! Sekarang dia cuma dokter gadungan bawa dua knalpot.": "ns_b3",
+  "Mesinnya berasap! Tunggu lengannya tersangkut habis menghantam, lalu serang habis-habisan.": "ns_b4",
+  "Gelap total! Teriak TO-KEK untuk menemukan dia!": "ns_b5",
+  "\"Tokek jatuh dari plafon itu biasa. Yang penting naik lagi.\" — Nek Sum": "q_ns1",
+  "\"Pahlawan sejati bangkit lagi. Setelah minum teh hangat.\" — Nek Sum": "q_ns2",
+  "\"Ekor putus bisa tumbuh lagi, Lang. Semangat juga.\" — Nek Sum": "q_ns3",
+  "Balik jadi orang biasa gratis, Mas. Yang bayar cuma jadi pahlawan.": "ps_back",
+  "Dua ribu, Mas. Mau pahlawan, mau bukan, tetap bayar.": "ps_2000",
+  "Mas... pintunya jangan dibanting.": "ps_door",
+  "Ngutang lagi? Pahlawan kok bokek.": "ps_debt",
+  "Langganan ya, Mas? Besok saya kasih kartu member.": "ps_member",
+  "Kostumnya bagus. Nyewa di mana?": "ps_rent",
+  "Hati-hati, Mas. Lantainya licin habis dipel.": "ps_floor",
+  "Jangan lama-lama, yang antre banyak.": "ps_queue",
+  "Utangnya saya catat ya, Mas. Sudah 1 kali.": "ps_debt1",
+  "Utangnya saya catat ya, Mas. Sudah 2 kali.": "ps_debt2",
+  "Utangnya saya catat ya, Mas. Sudah 3 kali.": "ps_debt3",
+  "Utangnya saya catat ya, Mas. Sudah 4 kali.": "ps_debt4",
+  "Utangnya saya catat ya, Mas. Sudah 5 kali.": "ps_debt5",
+  "Utangnya saya catat ya, Mas. Sudah 6 kali.": "ps_debt6",
+  "Utangnya saya catat ya, Mas. Sudah 7 kali.": "ps_debt7",
+  "Utangnya saya catat ya, Mas. Sudah 8 kali.": "ps_debt8",
+  "Utangnya saya catat ya, Mas. Sudah 9 kali.": "ps_debt9",
+  "Utangnya saya catat ya, Mas. Sudah berkali-kali.": "ps_debtX",
+  "Mas Gilang... utang toiletnya Rp2.000 ya.": "ps_owe1",
+  "Mas Gilang... utang toiletnya Rp4.000 ya.": "ps_owe2",
+  "Mas Gilang... utang toiletnya Rp6.000 ya.": "ps_owe3",
+  "Mas Gilang... utang toiletnya Rp8.000 ya.": "ps_owe4",
+  "Mas Gilang... utang toiletnya Rp10.000 ya.": "ps_owe5",
+  "Mas Gilang... utang toiletnya Rp12.000 ya.": "ps_owe6",
+  "Mas Gilang... utang toiletnya Rp14.000 ya.": "ps_owe7",
+  "Mas Gilang... utang toiletnya Rp16.000 ya.": "ps_owe8",
+  "Mas Gilang... utang toiletnya Rp18.000 ya.": "ps_owe9",
+  "Mas Gilang... utang toiletnya numpuk. Jangan kabur ya.": "ps_oweX",
+  "Mas Gilang... utang toiletnya lunas. Tumben.": "ps_paid",
+  "\"Mas, kalau pingsan jangan di depan toilet saya.\" — Pak Slamet": "q_ps",
+  "Ini, Pak. Doakan saya selamat.": "gl_pay",
+  "Ngutang dulu ya, Pak. Demi kota.": "gl_debt",
+  "Satu lampu lagi beres. Gaji UMR, cicilan motor belum lunas. Hidup.": "gl_m1",
+  "Lagi, Nek? Baru juga mau makan.": "gl_eat",
+  "Bunganya berbunga, Nek?": "gl_m2",
+  "Toiletnya gelap juga, Nek?": "gl_m5",
+  "Subuh. Jam kerja teknisi lampu jalan sudah mulai lagi.": "gl_end",
+  "Malam ini... kota tidak sendirian.": "tm_hero",
+  "Satu-satunya yang kubayar malam ini cuma toilet umum.": "tm_toilet",
+  "Parkir di sini gratis mulai malam ini.": "tm_m1",
+  "Bungamu lebih jelek.": "tm_m2a",
+  "Lunas.": "tm_m2b",
+  "Resepmu cuma bikin tetangga darah tinggi.": "tm_m3a",
+  "Ssst. Orang mau tidur.": "tm_stealth",
+  "Dari sini kota kelihatan kecil. Masalahnya saja yang besar.": "tm_perch",
+  "IMB-mu mana?": "tm_m4a",
+  "Besok ditanami pohon lagi.": "tm_m4b",
+  "Kenapa?": "tm_m5a",
+  "Malam ini jualanmu tutup.": "tm_m5b",
+  "Kota ini tak pernah tidur. Tapi malam ini... lampunya menyala.": "tm_m5end",
+  "Kota tidur. Tokek tidak.": "tm_motto",
+  "Kota ini tak pernah tidur. Lampunya saja yang sering mati.": "nr_1",
+  "Pukul dua pagi. Geng Brong meraung keliling kota. Bayi menangis. Kucing stres. Nek Sum tidak bisa tidur.": "nr_2",
+  "Taman kota hilang semalam. Paginya sudah jadi fondasi. Papan proyeknya: Beton Jaya. Izinnya: tidak ada.": "nr_3",
+  "Parkir di kotaku? Bayar. Lewat? Bayar. Napas? Bayar juga.": "bj_intro",
+  "MUNDUR... MUNDUR... YAK, HAJAR DIA!": "bj_hajar",
+  "(dari tumpukan balok) Aduh... karcisku... kembaliannya belum...": "bj_ko",
+  "MUNDUR... MUNDUR...": "bj_s1",
+  "YAK, TERUS!": "bj_s2",
+  "BAYAR DUA RIBU!": "bj_s3",
+  "ANAK BUAH! ATUR PARKIRAN!": "bj_s4",
+  "Tokek Man. Skor kreditmu jelek sekali. Utang toilet saja belum lunas.": "br_intro",
+  "Pinjam seratus, kembali seribu. Itu namanya... INOVASI. Drone, tagih dia!": "br_drone",
+  "(dari tumpukan balok) Aplikasiku... di-uninstall...": "br_ko",
+  "SPAM TAGIHAN!": "br_s1",
+  "JATUH TEMPO!": "br_s2",
+  "BUNGA BERBUNGA!": "br_s3",
+  "Jaga jarak, belum lunas!": "br_s4",
+  "BUNGA NAIK DUA KALI LIPAT!": "br_s5",
+  "DENDA KETERLAMBATAN!": "br_s6",
+  "Sunyi itu penyakit! Dan aku... DOKTERNYA! Resepku: seratus dua puluh desibel, tiga kali sehari!": "bk_intro",
+  "(dari tumpukan balok) Knalpotku... standar lagi...": "bk_ko",
+  "GEBER SAMPAI JEBOL!": "bk_s1",
+  "BREEEM! BREEEM!": "bk_s2",
+  "KNALPOT GANDA!": "bk_s3",
+  "SEMBURAN GAS BUANG!": "bk_s4",
+  "BREEEM!": "bk_s5",
+  "KNALPOTKUUU!!": "bk_s6",
+  "TELINGAKU!": "bk_s7",
+  "Kota ini kebanyakan taman! Kebanyakan pohon! Aku akan cor SEMUANYA jadi beton!": "bb_intro",
+  "... HANTAM DIA!": "bb_hajar",
+  "(dari tumpukan balok) Proyekku... mangkrak...": "bb_ko",
+  "HANTAM!": "bb_s1",
+  "SEMPROT SEMEN!": "bb_s2",
+  "PUTAR 360!": "bb_s3",
+  "LINDAS!": "bb_s4",
+  "TAMBAH TUKANG! LEMBUR SEMUA!": "bb_s5",
+  "SISTEM GANGGUAN!": "bb_s6",
+  "Selamat malam, Kota Gulita. Ini Tuan Padam. Lampu kalian... saya PADAMKAN. Selamanya.": "bp_speaker",
+  "Selamat datang di atap kota, Tokek. Dari sini kupadamkan semuanya dengan satu saklar.": "bp_intro",
+  "Karena dalam gelap, semua orang butuh aku. Dan lilin jualanku... laris manis.": "bp_why",
+  "(dari tumpukan balok) Saklarnya... jangan... tagihan listrikku...": "bp_ko",
+  "BOLA LISTRIK!": "bp_s1",
+  "SAMBARAN!": "bp_s2",
+  "BADAI PADAM!": "bp_s3",
+  "KALIAN TERLALU TERANG!": "bp_s4",
+  "PADAM SEMUANYA!": "bp_s5",
+  "SILAU!": "bp_s6"
 };
 const Voice = (function () {
   let buf = null, state = 0, busyUntil = 0, cur = null; const lastT = {}, log = [];   // state: 0 idle, 1 loading, 2 ready, 3 unavailable
@@ -3320,21 +3473,18 @@ const Voice = (function () {
       const s = ctx.createBufferSource(); s.buffer = buf; const g = ctx.createGain(); g.gain.value = v; s.connect(g); g.connect(Snd.voxBus);
       const t0 = now + (o.delay || 0); s.start(t0, Math.max(0, e[0] - 0.012), e[1] + 0.03);
       lastT[grp] = now; if (o.solo) { busyUntil = t0 + e[1]; cur = s; } log.push(id); if (log.length > 40) log.shift();
+      if (Snd.duck) Snd.duck(o.solo ? 0.55 : (o.duck || 0.25), (o.delay || 0) + e[1]);
     } catch (x) { return 0; }
     return e[1];
   }
-  // a dialogue or radio line: speak it if it has a recording; Nek Sum at least calls out when she has none
-  function line(who, text) {
-    const id = VOICE_LINE[text]; if (id) return say(id, { solo: true, cut: true });
-    if (who === 'NEK SUM') {
-      if (/keributan|pungli|Geng Brong lagi|Penagih pinjol|kuli bayaran|mencopoti lampu/.test(text)) { say('ns_crime', { solo: true, gap: 6 }); return 0; }
-      if (/^Bagus|^Menyala|Nenek bangga/.test(text)) { say('ns_good', { solo: true, gap: 8 }); return 0; }
-      if (/^Awas|Hati-hati|^Jaga dirimu/.test(text)) { say('ns_care', { solo: true, gap: 6 }); return 0; }
-      if (/^Lang[!,]/.test(text)) { say('ns_lang', { solo: true, gap: 3 }); return 0; }
-    }
-    return 0;
+  // a dialogue or radio line: every line in the game has its own recording
+  function line(who, text) { const id = VOICE_LINE[text]; return id ? say(id, { solo: true, cut: true }) : 0; }
+  // a boss calling out an attack (the speech bubble over its head): spoken in its own voice, never over dialogue
+  function shout(text, e) {
+    const id = VOICE_LINE[text], ctx = Snd.ctx; if (!id || !ctx || ctx.currentTime < busyUntil - 0.1) return 0;
+    return say(id, { grp: 'shout', gap: 1.4, x: e.x, z: e.z, duck: 0.3 });
   }
-  return { load, say, line, log, get ready() { return state === 2; }, get state() { return state; } };
+  return { load, say, line, shout, log, get ready() { return state === 2; }, get state() { return state; } };
 })();
 // ===================== FX: particles, bricks, popups, weather =====================
 const G = {
@@ -3900,12 +4050,12 @@ const Player = {
   P.setStealth = function (on) {
     if (on === P.stealth) return; if (on && (!P.hero || P.en < 8)) { UI.toast('Energi kurang untuk Mode Bunglon', 1.4); return; }
     P.stealth = on; Snd.play(on ? 'stealthOn' : 'stealthOff'); const v = P.veh; FX.ring(P.x, P.y + 0.1, P.z, 0.5, v ? 5 : 3.4, 0.4, 0.3, 0.9, 1, 0.8, true);
-    if (on) FX.text(P.x, P.y + 2.6, P.z, 'MODE BUNGLON', 'mv', 1.1);
+    if (on) { FX.text(P.x, P.y + 2.6, P.z, 'MODE BUNGLON', 'mv', 1.1); Voice.say('tm_bunglon', { gap: 25, vol: 0.9 }); }
   };
   P.hurt = function (dmg, sx, sz, o) {
     o = o || {}; if (G.god || !P.alive || P.inv > 0 || P.state === 'dash' || G.state !== 'play') return false;
     dmg *= DIFFS[G.diff].dmg; if (P.veh) { if (P.veh.kind === 'robot') { dmg *= 0.3; P.veh.power -= dmg * 0.35; } else dmg *= 0.5; }
-    P.hp -= dmg; G.dmgTaken += dmg; P.inv = 0.8; P.hits = 0; UI.hurt(); Snd.play('hurt'); if (!P.veh && dmg >= 5) Voice.say(['tm_hurt1', 'tm_hurt2'], { grp: 'hurt', gap: 1.6, vol: 0.9 }); CamCtl.addShake(o.heavy ? 0.5 : 0.28); FX.text(P.x, P.y + 2.5, P.z, '-' + Math.round(dmg), 'hurt'); FX.star(P.x, P.y + 1.3, P.z, 1.1, 1, 0.3, 0.2);
+    P.hp -= dmg; G.dmgTaken += dmg; P.inv = 0.8; P.hits = 0; UI.hurt(); Snd.play('hurt'); if (!P.veh && dmg >= 5) { if (P.hp > 0 && P.hp < P.maxHp * 0.3) Voice.say('tm_low', { grp: 'low', gap: 40, delay: 0.3 }); else Voice.say(['tm_hurt1', 'tm_hurt2'], { grp: 'hurt', gap: 1.6, vol: 0.9 }); } CamCtl.addShake(o.heavy ? 0.5 : 0.28); FX.text(P.x, P.y + 2.5, P.z, '-' + Math.round(dmg), 'hurt'); FX.star(P.x, P.y + 1.3, P.z, 1.1, 1, 0.3, 0.2);
     if (P.stealth) P.setStealth(false);
     if (P.hp <= 0) { P.hp = 0; P.die(); return true; }
     if (!P.veh && P.state !== 'perch') {
@@ -3919,7 +4069,7 @@ const Player = {
   // ---------- vehicles ----------
   P.callVehicle = function (kind) {
     if (!P.hero) { UI.toast('Ganti kostum dulu di toilet umum', 1.6); return; }
-    if (P.veh || P.callCd > 0 || !P.onGround) return; const v = Vehicles[kind]; P.callCd = 1.2;
+    if (P.veh || P.callCd > 0 || !P.onGround) return; const v = Vehicles[kind]; P.callCd = 1.2; Voice.say(kind === 'bike' ? 'tm_bike' : 'tm_car', { grp: 'veh', gap: 8 });
     let sx, sz, syaw = P.yaw, found = false;
     if (World.onRoad(P.x, P.z)) { for (const [a, d] of [[HPI, v.r + 1.3], [-HPI, v.r + 1.3], [0, v.r + 2.4], [PI, v.r + 2.4]]) { const x = P.x + Math.sin(P.yaw + a) * d, z = P.z + Math.cos(P.yaw + a) * d; if (World.onRoad(x, z) && !World.spotBlocked(x, z, v.r + 0.2)) { sx = x; sz = z; found = true; break; } } }
     if (!found) { const s = World.roadSpot(P.x, P.z); sx = s[0]; sz = s[1]; syaw = s[2]; }
@@ -4132,7 +4282,7 @@ const Player = {
       P.hits++; P.hitT = 2.8; P.moveName = mv.name; if (P.hits > G.maxCombo) G.maxCombo = P.hits; P.en = Math.min(P.maxEn, P.en + (mv.final ? 8 : 2.6));
       G.hitStop = Math.max(G.hitStop, mv.final ? 0.11 : 0.04); CamCtl.addShake(mv.final ? 0.6 : 0.14); Snd.play('punch', mv.final || !!mv.launch);
       FX.text(P.x, P.y + 2.9, P.z, mv.name, mv.final ? 'crit' : 'mv', 0.8);
-      if (mv.final) { FX.big('BANTINGAN TOKEK!', '', 1.1); FX.slowmo(0.28, 0.55); Voice.say('tm_fin'); } else if (P.ci % 3 === 1 || mv.launch) Voice.say(['tm_atk1', 'tm_atk2', 'tm_atk3'], { grp: 'atk', gap: 1.1, vol: 0.8 });
+      if (mv.final) { FX.big('BANTINGAN TOKEK!', '', 1.1); FX.slowmo(0.28, 0.55); Voice.say('tm_fin'); } else if (P.ci % 3 === 1 || mv.launch) Voice.say(['tm_atk1', 'tm_atk2', 'tm_atk3', 'tm_atk4'], { grp: 'atk', gap: 1.0, vol: 0.85 });
       if (P.takedown) { FX.big('SENYAP!', 'cy', 0.9); Snd.play('dash'); Voice.say('tm_stealth', { solo: true, gap: 14, delay: 0.35 }); }
       if (P.stealth) P.setStealth(false);
     }
@@ -4158,7 +4308,7 @@ const Player = {
     const t = Combat.pickTarget(P.x, P.y, P.z, 22, yaw, mag > 0.3 ? 1.3 : 2.8, true); if (t) yaw = Math.atan2(t.x - P.x, t.z - P.z);
     P.yaw = yaw; P.state = 'wave'; P.st = 0; P.waveCd = 2.4; P.en -= 28; P.waveDone = false; P.ci = -1; P.cT = 0; Snd.play('wave'); Voice.say('tm_wave', { gap: 9 }); if (P.stealth) P.setStealth(false);
   }
-  function startSonar() { P.state = 'sonar'; P.st = 0; P.sonarCd = 6; P.en -= 45; P.sonarDone = false; P.vx = P.vz = 0; P.inv = Math.max(P.inv, 0.7); Snd.play('tokek', 3); Voice.say(['tm_tokek2', 'tm_tokek3'], { grp: 'tokek' }); Combat.sonarCharge(P.x, P.y, P.z, false); }
+  function startSonar() { P.state = 'sonar'; P.st = 0; P.sonarCd = 6; P.en -= 45; P.sonarDone = false; P.vx = P.vz = 0; P.inv = Math.max(P.inv, 0.7); Snd.play('tokek', 3); Voice.say(['tm_tokek1', 'tm_tokek2', 'tm_tokek3'], { grp: 'tokek' }); Combat.sonarCharge(P.x, P.y, P.z, false); }
   function land(hard) { Snd.play('land'); FX.dust(P.x, P.y, P.z, hard ? 10 : 4); }
   function scanInteract() {
     P.interact = null; if (G.state !== 'play' || !P.ctrl) return;
@@ -4265,7 +4415,7 @@ const Player = {
     if (!P.onGround) {
       P.air += dt;
       if (P.hero && P.state === 'normal') {
-        if (can && Input.held.jump && P.air > 0.16 && P.en > 0.5) { P.flying = true; P.vy = damp(P.vy, 6.8, 7, dt); P.en = Math.max(0, P.en - 12 * dt); Snd.play('flap'); if (Math.random() < dt * 14) FX.p(P.x + rnd(-1, 1), P.y + 0.6, P.z + rnd(-1, 1), 0, -2, 0, 0.4, 0.5, 0.1, 0.6, 0.4, 1, 0.5, SPR.GLOW); }
+        if (can && Input.held.jump && P.air > 0.16 && P.en > 0.5) { if (!P.flying && P.air < 0.5) Voice.say('tm_fly', { grp: 'fly', gap: 45, vol: 0.9 }); P.flying = true; P.vy = damp(P.vy, 6.8, 7, dt); P.en = Math.max(0, P.en - 12 * dt); Snd.play('flap'); if (Math.random() < dt * 14) FX.p(P.x + rnd(-1, 1), P.y + 0.6, P.z + rnd(-1, 1), 0, -2, 0, 0.4, 0.5, 0.1, 0.6, 0.4, 1, 0.5, SPR.GLOW); }
         else if (P.vy < -2.9) { P.vy = damp(P.vy, -2.9, 10, dt); P.gliding = true; }
       }
       if (!P.flying && P.state !== 'dive' && P.state !== 'dash') P.vy -= GRAV * dt;
@@ -4399,7 +4549,7 @@ const Combat = (function () {
   function talks(e) { return !e.boss && e.kind !== 'drone' && e.kind !== 'biker' && !e.def.shadow; }
   function alert(e, quiet) {
     if (e.aware) return; e.aware = true; e.state = 'chase'; e.st = 0;
-    if (!quiet) { FX.text(e.x, e.y + 2.7 * e.rig.scale, e.z, '!', 'warn', 0.7); Snd.play('alert'); if (talks(e)) Voice.say(['th1_spot', 'th2_spot', 'th1_taunt'], { grp: 'spot', gap: 6, x: e.x, z: e.z, vol: 0.85 }); }
+    if (!quiet) { FX.text(e.x, e.y + 2.7 * e.rig.scale, e.z, '!', 'warn', 0.7); Snd.play('alert'); if (talks(e)) Voice.say(['th1_spot', 'th2_spot', 'th1_taunt'], { grp: 'spot', gap: 6, x: e.x, z: e.z, vol: 0.85 }); if (Player.hero && !Player.veh && !e.boss) Voice.say(['tm_go1', 'tm_go2', 'tm_go3'], { grp: 'go', gap: 35, delay: 1.0 }); }
     for (const o of G.enemies) if (o !== e && o.alive && !o.aware && o.group === e.group && hyp(o.x - e.x, o.z - e.z) < 16) { o.aware = true; o.state = 'chase'; o.st = 0; }
     if (e.guard) { G.detected = true; Mission.onAlarm(e); }
   }
@@ -4441,6 +4591,7 @@ const Combat = (function () {
     if (e.kind === 'drone') FX.boom(e.x, cy, e.z, 1.0, 1, 0.4, 0.7);
     FX.flash(e.x, cy + 1, e.z, 1.7 * sc, 1, 0.9, 0.6, 0.18); Snd.play('bricks', big);
     if (talks(e) && Math.random() < 0.45) Voice.say(['th2_ko', 'th1_flee', 'th1_hurt'], { grp: 'eko', gap: 3.5, x: e.x, z: e.z, vol: 0.8 });
+    else if (!e.boss && Player.hero && !Player.veh && Math.random() < 0.3) Voice.say(['tm_ko1', 'tm_ko2', 'tm_taunt'], { grp: 'ko', gap: 12, delay: 0.45 });
     if (!e.noDrop) { dropCoins(e.x, cy + 1, e.z, e.def.coins || 1); if (Math.random() < 0.16 || big) pickup('nasi', e.x, cy + 1, e.z); }
     if (e.onDeath) e.onDeath(e);
     Mission.onKill(e);
@@ -4792,7 +4943,7 @@ const Combat = (function () {
 // ===================== THE FIVE BIG BOSSES (Sindikat Lima Bayang) =====================
 const Boss = (function () {
   const DEF = {}, P = Player, _w = [0, 0, 0];
-  const say = (e, text, cls) => FX.text(e.x, e.y + (e.fly || 0) + (e.boss.popY || 2.7 * e.rig.scale), e.z, text, cls || 'warn', 1.4);
+  const say = (e, text, cls) => { FX.text(e.x, e.y + (e.fly || 0) + (e.boss.popY || 2.7 * e.rig.scale), e.z, text, cls || 'warn', 1.4); Voice.shout(text, e); };
   const face = (e, dt, rate) => { e.yaw = angDamp(e.yaw, Math.atan2(P.x - e.x, P.z - e.z), rate || 6, dt); };
   const distP = e => hyp(P.x - e.x, P.z - e.z);
   const stop = (e, dt) => { e.vx = approach(e.vx, 0, 40 * dt); e.vz = approach(e.vz, 0, 40 * dt); };
@@ -5136,7 +5287,7 @@ const Boss = (function () {
     if (d.init) d.init(e);
     G.enemies.push(e); G.boss = e; return e;
   }
-  function begin(e) { e.state = 'idle'; e.st = 0; e.cd = 1.0; if (e.boss.begin) e.boss.begin(e); }
+  function begin(e) { e.state = 'idle'; e.st = 0; e.cd = 1.0; if (e.boss.begin) e.boss.begin(e); Voice.say('tm_boss', { grp: 'boss', gap: 20, delay: 0.5 }); }
   function update(e, dt) {
     const d = e.boss; e.cd = Math.max(0, e.cd - dt); e.at += dt;
     if (e.state === 'intro') { if (!e.noPhys) Combat.physics(e, dt, 8); return; }
@@ -5300,7 +5451,7 @@ const Mission = {
       await c.shot(wide, 0.9); await c.say(WHO.S, 'Mas... pintunya jangan dibanting.');
     } else { await c.wait(0.35); }
     doorTo(t, 0, 0.4); P.cineFn = null; Game.sv.seenToilet = true; Game.save();
-    if (!first && !c.skipped) UI.radio('PAK SLAMET', pick(G.debt > 0 ? ['Utangnya saya catat ya, Mas. Sudah ' + G.debt + ' kali.', 'Ngutang lagi? Pahlawan kok bokek.'] : ['Langganan ya, Mas? Besok saya kasih kartu member.', 'Kostumnya bagus. Nyewa di mana?', 'Hati-hati, Mas. Lantainya licin habis dipel.', 'Jangan lama-lama, yang antre banyak.']));
+    if (!first && !c.skipped) UI.radio('PAK SLAMET', pick(G.debt > 0 ? [G.debt > 9 ? 'Utangnya saya catat ya, Mas. Sudah berkali-kali.' : 'Utangnya saya catat ya, Mas. Sudah ' + G.debt + ' kali.', 'Ngutang lagi? Pahlawan kok bokek.'] : ['Langganan ya, Mas? Besok saya kasih kartu member.', 'Kostumnya bagus. Nyewa di mana?', 'Hati-hati, Mas. Lantainya licin habis dipel.', 'Jangan lama-lama, yang antre banyak.']));
   }
   M.useToilet = function (t) { if (Cut.active) return; const toHero = !P.hero; Cut.run(c => toiletCut(c, t, toHero)); };
   M.warung = function () {
@@ -5689,7 +5840,7 @@ const Mission = {
         await c.fade(1, 1.0); P.setHero(false, true); const hq = HQ(); P.teleport(hq.startX, 0.25, hq.startZ, 0); P.cineFn = null; Weather.S.dawn = 0.75;
         c.cutTo({ p: [hq.x + 7, 3, hq.z + 8], t: [hq.x - 1, 1.7, hq.z + 1], fov: 32, ap: 0.8, range: 5, fog: [70, 0.004] }); await c.fade(0, 1.0);
         await c.say(WHO.G, 'Subuh. Jam kerja teknisi lampu jalan sudah mulai lagi.');
-        await c.say(WHO.S, 'Mas Gilang... utang toiletnya ' + (G.debt > 0 ? 'Rp' + (G.debt * 2000).toLocaleString('id-ID') + ' ya.' : 'lunas. Tumben.'));
+        await c.say(WHO.S, G.debt > 9 ? 'Mas Gilang... utang toiletnya numpuk. Jangan kabur ya.' : 'Mas Gilang... utang toiletnya ' + (G.debt > 0 ? 'Rp' + String(G.debt * 2000).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' ya.' : 'lunas. Tumben.'));
         c.card('', 'TAMAT', 'Kota tidur. Tokek tidak.', 4); c.snd('tokek', 3); await c.wait(3.6); await c.fade(1, 0.8);
         Weather.S.dawn = 0; resetPower();
       }));
@@ -5802,7 +5953,7 @@ const Game = (function () {
   window.addEventListener('unhandledrejection', e => softError(e.reason));
   return { sv, get opt() { return sv.opt; }, save, load, applyOpt, boot, softError, startMission, startFree, startFromMenu, pause, resume, retry, toMenu, onDeath, frame, perf, setLevel, get errN() { return errN; }, get started() { return started; } };
 })();
-window.__T = { G, Player, Mission, Combat, Game, Cut, CamCtl, World, R, Env, Weather, Boss, Vehicles, Input, UI, Snd, FX, MISSIONS, Cam, Lang, TX, Voice };
+window.__T = { G, Player, Mission, Combat, Game, Cut, CamCtl, World, R, Env, Weather, Boss, Vehicles, Input, UI, Snd, FX, MISSIONS, Cam, Lang, TX, Voice, VL: VOICE_LINE };
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', Game.boot); else Game.boot();
 
 })();
